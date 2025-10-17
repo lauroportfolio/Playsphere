@@ -21,12 +21,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider afterSignOutUrl="/">
       <html lang="en">
         <body className={inter.className}>
           <Topbar />
 
-          <main>
+          <main className="main-layout">
             <LeftSidebar />
             
             <section className="main-container">
