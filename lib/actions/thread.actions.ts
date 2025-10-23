@@ -106,3 +106,42 @@ export async function fetchThreadById(id: string) {
         throw new Error(`Erro ao buscar a postagem: ${error.message}`)
     }
 }
+
+export async function addCommentToThread(
+    threadId: string,
+    commentText: string,
+    userId: string,
+    path: string,
+) {
+    connectToDB();
+
+    try {
+        // encontrar o post original pelo ID
+        const originalThread = await Thread.findById(threadId);
+
+        if(!originalThread) {
+            throw new Error("Postagem não encontrada")
+        }
+
+        // criar um novo post com a área de comentário
+        const commentThread = new Thread({
+            text: commentText,
+            author: userId,
+            parentId: threadId,
+        })
+
+        // salvar o novo post
+        const savedCommentThread = await commentThread.save();
+
+        // atualizar o post original incluindo o novo comentário
+        originalThread.children.push(savedCommentThread._id);
+
+        // salvar o post original
+        await originalThread.save();
+
+        revalidatePath(path);
+
+    } catch (error: any) {
+        throw new Error(`Erro ao adicionar seu comentário: ${error.message}`)
+    }
+}

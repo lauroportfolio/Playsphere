@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { usePathname, useRouter } from "next/navigation";
 import { CommentValidation } from "@/lib/validations/thread";
 import Image from "next/image";
+import { addCommentToThread } from "@/lib/actions/thread.actions";
 
 // import { updateUser } from "@/lib/actions/user.actions";
 // import { createThread } from "@/lib/actions/thread.actions";
@@ -39,15 +40,14 @@ const Comment = ({ threadId, currentUserImg, currentUserId }: Props) => {
     });
 
     const onSubmit = async (values: z.infer<typeof CommentValidation>) => {
-        /*await createThread({
-            text: values.thread,
-            author: userId,
-            communityId: null, // mudar dps
-            path: pathname,
-        });
-        */
+        await addCommentToThread(
+            threadId,
+            values.thread,
+            JSON.parse(currentUserId),
+            pathname
+        );
 
-        router.push("/");
+        form.reset();
     }
 
     return (
