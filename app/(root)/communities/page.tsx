@@ -1,7 +1,7 @@
 const Page = async () => {
     return (
         <section>
-            <h1 className="head-text">Comunidades</h1>
+            <h1 className="head-text mb-10">Comunidades</h1>
         </section>
     )
 }

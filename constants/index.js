@@ -12,12 +12,12 @@ export const sidebarLinks = [
   {
     imgURL: "/assets/heart.svg",
     route: "/activity",
-    label: "Atividades",
+    label: "Notificações",
   },
   {
     imgURL: "/assets/create.svg",
     route: "/create-thread",
-    label: "Criar Postagem",
+    label: "Criar Post",
   },
   {
     imgURL: "/assets/community.svg",

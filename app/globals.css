@@ -1,4 +1,4 @@
-/* VIDEO EM 3:34:34 MINUTOS COM PROBLEMA NO ÍCONE PERFIL*/
+/* VIDEO EM 4:56:56 MINUTOS COM PROBLEMA NO ÍCONE PERFIL*/
 @import "tailwindcss";
 @import "tw-animate-css";
 @tailwind utilities;
@@ -231,8 +231,20 @@ main {
   box-sizing: border-box;
 }
 
+.no-result {
+    text-align: center;
+    font-size: 16px!important;
+    line-height: 140%!important;
+    font-weight: 400!important;
+    color: #7878A3;
+  }
+
 .block {
   display: block;
+}
+
+.text-primary-500 {
+  color: #877EFF;
 }
 
 .bg-primary-500 {
@@ -250,6 +262,10 @@ main {
 .noTextDecoration {
   text-decoration: none;
   /* <-- remove underline */
+}
+
+.bg-dark-1{
+  background-color: #000000;
 }
 
 .bg-dark-2 {
@@ -327,6 +343,68 @@ main {
   color: #FFFFFF;
 }
 
+.user-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem; /* equivalente a gap-4 */
+}
+
+.user-card_avatar {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.75rem; /* equivalente a gap-3 */
+}
+
+.user-card_btn {
+  height: auto;
+  min-width: 74px;
+  border-radius: 0.5rem;
+  background-color: #877EFF; 
+  font-size: 12px;
+  color: #FFFFFF !important;
+}
+
+/* Activity */
+.activity-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* equivalente a gap-2 */
+  border-radius: 0.375rem; /* rounded-md */
+  background-color: #121417;
+  padding-left: 1.75rem;  /* px-7 → 1.75rem = 28px */
+  padding-right: 1.75rem;
+  padding-top: 1rem;      /* py-4 → 1rem = 16px */
+  padding-bottom: 1rem;
+}
+
+
+/* A partir do breakpoint xs (~640px no Tailwind) */
+@media (min-width: 640px) {
+  .user-card_avatar {
+    align-items: center;
+  }
+}
+
+/* Para telas até o breakpoint xs (~640px no Tailwind) */
+@media (max-width: 640px) {
+  .user-card {
+    border-radius: 0.75rem; /* rounded-xl */
+    background-color: var(--dark-3); /* substitua por sua cor real */
+    padding: 1rem; /* p-4 */
+  }
+}
+
+/* Para telas a partir do breakpoint xs */
+@media (min-width: 640px) {
+  .user-card {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
 /* Responsivo: max-xs:w-full → largura total em telas pequenas */
 @media (max-width: 475px) {
   .comment-form_btn {
@@ -371,6 +449,15 @@ main {
 .text-light-2 {
   color: #EFEFEF;
 }
+
+.text-light-3 {
+  color: #7878A3;
+}
+
+.text-light-4 {
+  color: #5C5C7B;
+}
+
 
 .signOutButton {
   display: flex;
@@ -657,13 +744,10 @@ main {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  max-width: 768px;
-  /* 3xl */
-  padding-left: 2.5rem;
-  /* px-10 */
+  max-width: 48rem;     /* max-w-3xl → 768px */
+  padding-left: 2.5rem; /* px-10 → 40px */
   padding-right: 2.5rem;
-  padding-top: 5rem;
-  /* py-20 */
+  padding-top: 5rem;    /* py-20 → 80px */
   padding-bottom: 5rem;
 }
 
