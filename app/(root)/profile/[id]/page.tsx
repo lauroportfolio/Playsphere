@@ -13,12 +13,11 @@ import { profileTabs } from "@/constants";
 import Image from "next/image";
 import ThreadsTab from "@/components/shared/ThreadsTab";
 
-async function Page({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params // next agora exige que o params seja async
+async function Page({ params }: { params: { id: string } }) {
     const user = await currentUser();
     if (!user) return null;
 
-    const userInfo = await fetchUser(id);
+    const userInfo = await fetchUser(params.id);
     if (!userInfo?.onboarded) redirect('/onboarding');
     return (
         <section>
