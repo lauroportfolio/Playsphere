@@ -29,11 +29,11 @@ export default function RootLayout({
         <body className={inter.className}>
           <Topbar />
 
-          <main className="main-layout">
+          <main className="flex flex-row">
             <LeftSidebar />
             
             <section className="main-container">
-              <div className="div-container">
+              <div className="w-full max-w-4xl">
                 {children}
               </div>
             </section>
@@ -45,5 +45,5 @@ export default function RootLayout({
         </body>
       </html>
     </ClerkProvider>
-  )
+  );
 }

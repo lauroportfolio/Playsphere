@@ -3,18 +3,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SignOutButton, SignedIn, useAuth } from "@clerk/nextjs";
-
+import { SignOutButton, SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
 import { sidebarLinks } from "@/constants";
 
 function LeftSidebar() {
   const pathname = usePathname();
   const { userId, isLoaded } = useAuth(); 
 
-  if (!isLoaded || !userId) return null;
+  if (!isLoaded) return null; // apenas espera carregar, mas não bloqueia a sidebar
 
   const linksWithUser = sidebarLinks.map((link) => {
-    if (link.route === "/profile") {
+    if (link.route === "/profile" && userId) {
       return { ...link, route: `/profile/${userId}` };
     }
     return link;
@@ -52,6 +51,14 @@ function LeftSidebar() {
             </div>
           </SignOutButton>
         </SignedIn>
+
+        {/* Mostra botão de login quando estiver deslogado */}
+        <SignedOut>
+          <Link href="/sign-in" className="signOutButton-leftsiderbar">
+            <Image src="/assets/logout.svg" alt="login" width={24} height={24} />
+            <p className="text-light-2 max-lg-hidden">Entrar</p>
+          </Link>
+        </SignedOut>
       </div>
     </section>
   );
