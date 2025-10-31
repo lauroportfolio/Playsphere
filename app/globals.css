@@ -384,6 +384,49 @@ main {
   padding-bottom: 1rem;
 }
 
+/* Community Card */
+.community-card {
+  width: 100%;
+  border-radius: 0.5rem; /* rounded-lg */
+  background-color: #101012;
+  padding-left: 1rem;  /* px-4 → 16px */
+  padding-right: 1rem;
+  padding-top: 1.25rem; /* py-5 → 20px */
+  padding-bottom: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .community-card {
+    width: 24rem; /* sm:w-96 → 384px */
+  }
+}
+
+.communities-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.25rem; /* equivalente ao gap-9 */
+}
+
+@media (min-width: 640px) {
+  .communities-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.community-card_btn {
+  border-radius: 0.5rem;         /* rounded-lg */
+  background-color: #877EFF; /* bg-primary-500 */
+  padding-left: 1.25rem;         /* px-5 → 20px */
+  padding-right: 1.25rem;
+  padding-top: 0.375rem;         /* py-1.5 → 6px */
+  padding-bottom: 0.375rem;
+  font-size: 14px;    /* text-small-regular */
+  line-height: 140%;  /* text-small-regular */
+  font-weight: 400;   /* text-small-regular */
+  color: #FFFFFF; /* !text-light-1 */
+}
+
+
 
 /* A partir do breakpoint xs (~640px no Tailwind) */
 @media (min-width: 640px) {
@@ -427,8 +470,7 @@ main {
 .link1 {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  /* 16px */
+  gap: 0.1rem; /* distância entre logo e PlaySphere */
 }
 
 .div-topbar1 {
