@@ -13,10 +13,13 @@ export async function fetchUser(userId: string) {
   try {
     connectToDB();
 
-    return await User.findOne({ id: userId }).populate({
+    const user = await User.findOne({ id: userId }).populate({
       path: "communities",
       model: Community,
     });
+
+    // retorna null se o usuário não existir
+    return user || null;
   } catch (error: any) {
     throw new Error(`Erro ao buscar usuário: ${error.message}`);
   }

@@ -24,14 +24,18 @@ export default function RootLayout({
   return (
     <ClerkProvider appearance={{
       baseTheme: dark
-    }}>
+    }}
+      afterSignInUrl="/onboarding"   // ← novo usuários vão para onboarding
+      afterSignUpUrl="/onboarding"   // ← mesmo para cadastro
+      afterSignOutUrl="/onboarding"
+    >
       <html lang="en">
         <body className={inter.className}>
           <Topbar />
 
           <main className="flex flex-row">
             <LeftSidebar />
-            
+
             <section className="main-container">
               <div className="w-full max-w-4xl">
                 {children}
