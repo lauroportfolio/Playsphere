@@ -26,13 +26,14 @@ async function Page() {
                                 href={`/thread/${activity.parentId}`}
                             >
                                 <article className="activity-card">
-                                    <Image
-                                        src={activity.author.image}
-                                        alt="Foto de Perfil"
-                                        width={20}
-                                        height={20}
-                                        className="rounded-full object-cover"
-                                    />
+                                    <div className="relative w-8 h-8 rounded-full overflow-hidden">
+                                        <Image
+                                            src={activity.author.image}
+                                            alt="Foto de Perfil"
+                                            fill
+                                            className="object-cover"
+                                        />
+                                    </div>
 
                                     <p className="small-regular text-light-1">
                                         <span className="mr-1 text-primary-500">

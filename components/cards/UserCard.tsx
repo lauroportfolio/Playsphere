@@ -24,13 +24,15 @@ const UserCard = ({
     return (
         <article className="user-card">
             <div className="user-card_avatar">
-                <Image
-                    src={imgUrl}
-                    alt="logo"
-                    width={48}
-                    height={48}
-                    className="rounded-full"
-                />
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full">
+                    <Image
+                        src={imgUrl}
+                        alt="logo"
+                        fill
+                        style={{ flexShrink: 0 }}
+                        className="object-cover object-center"
+                    />
+                </div>
 
                 <div className="flex-1 text-ellipsis">
                     <h4 className="base-semibold text-light-1">{name}</h4>
