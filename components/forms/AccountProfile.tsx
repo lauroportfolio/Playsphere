@@ -24,6 +24,7 @@ import { isBase64Image } from "@/lib/utils";
 
 import { UserValidation } from "@/lib/validations/user";
 import { updateUser } from "@/lib/actions/user.actions";
+import { toast } from "sonner";
 
 interface Props {
   user: {
@@ -60,10 +61,18 @@ const AccountProfile = ({ user, btnTitle }: Props) => {
 
     const hasImageChanged = isBase64Image(blob);
     if (hasImageChanged) {
-      const imgRes = await startUpload(files);
+      if (files && files.length > 0) {
+        const imgRes = await startUpload(files);
 
-      if (imgRes && imgRes[0].ufsUrl) {
-        values.profile_photo = imgRes[0].ufsUrl;
+        if (!imgRes || imgRes.length === 0) {
+          console.error("⚠️ Falha no upload: resposta vazia do UploadThing");
+          toast.error("Falha ao enviar imagem. Tente novamente.");
+          return;
+        }
+
+        if (imgRes?.[0]?.url) {
+          values.profile_photo = imgRes[0].url;
+        }
       }
     }
 
@@ -229,7 +238,7 @@ const AccountProfile = ({ user, btnTitle }: Props) => {
           )}
         />
 
-        <Button type='submit' className='bg-primary-500'>
+        <Button type='submit' className='bg-primary-500 cursor-pointer'>
           {btnTitle}
         </Button>
       </form>

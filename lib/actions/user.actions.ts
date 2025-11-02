@@ -1,6 +1,6 @@
 "use server";
 
-import { FilterQuery, SortOrder } from "mongoose";
+import mongoose, { FilterQuery, SortOrder } from "mongoose";
 import { revalidatePath } from "next/cache";
 
 import Community from "../models/community.model";
@@ -13,12 +13,13 @@ export async function fetchUser(userId: string) {
   try {
     connectToDB();
 
-    const user = await User.findOne({ id: userId }).populate({
-      path: "communities",
-      model: Community,
-    });
+    const user = await User.findOne({ id: userId })
+      .select("id name username image bio onboarded followers following communities threads")
+      .populate({
+        path: "communities",
+        model: Community,
+      });
 
-    // retorna null se o usuário não existir
     return user || null;
   } catch (error: any) {
     throw new Error(`Erro ao buscar usuário: ${error.message}`);
@@ -67,33 +68,110 @@ export async function updateUser({
 
 export async function fetchUserPosts(userId: string) {
   try {
-    connectToDB();
+    await connectToDB();
 
-    // Find all threads authored by the user with the given userId
-    const threads = await User.findOne({ id: userId }).populate({
-      path: "threads",
-      model: Thread,
-      populate: [
-        {
+    const user = (await User.findOne({ id: userId })
+      .populate({
+        path: "threads",
+        model: Thread,
+        populate: [
+          {
+            path: "community",
+            model: Community,
+            select: "name id image _id",
+          },
+          {
+            path: "children",
+            model: Thread,
+            populate: {
+              path: "author",
+              model: User,
+              select: "name image id",
+            },
+          },
+        ],
+      })
+      .lean()) as {
+        _id: string;
+        id: string;
+        threads: any[];
+      } | null;
+
+    if (!user) return null;
+
+    // 1) Normalizar entries: podem ser objetos populados, ObjectId ou strings
+    const rawThreads = Array.isArray(user.threads) ? user.threads : [];
+
+    // separa ids que ainda são strings/ObjectId (não-populados) e objetos populados
+    const missingIds: string[] = [];
+    const populatedThreads: any[] = [];
+
+    for (const entry of rawThreads) {
+      if (!entry) continue;
+      if (typeof entry === "string") {
+        missingIds.push(entry);
+      } else if (entry._id) {
+        // já é objeto populado
+        populatedThreads.push(entry);
+      } else if (entry.toString && mongoose.Types.ObjectId.isValid(entry.toString())) {
+        // algum ObjectId bruto
+        missingIds.push(entry.toString());
+      } else {
+        // fallback — trata como string
+        try {
+          const s = String(entry);
+          if (s) missingIds.push(s);
+        } catch {
+          // ignora
+        }
+      }
+    }
+
+    // 2) buscar os threads faltantes (se houver)
+    let fetchedThreads: any[] = [];
+    if (missingIds.length > 0) {
+      // dedupe missingIds antes de buscar
+      const uniqueMissing = Array.from(new Set(missingIds));
+      fetchedThreads = await Thread.find({ _id: { $in: uniqueMissing } })
+        .populate({
           path: "community",
           model: Community,
-          select: "name id image _id", // Select the "name" and "_id" fields from the "Community" model
-        },
-        {
+          select: "name id image _id",
+        })
+        .populate({
           path: "children",
           model: Thread,
           populate: {
             path: "author",
             model: User,
-            select: "name image id", // Select the "name" and "_id" fields from the "User" model
+            select: "name image id",
           },
-        },
-      ],
-    });
-    return threads;
-  } catch (error) {
-    console.error("Erro ao buscar os posts do usuário:", error);
-    throw error;
+        })
+        .lean();
+    }
+
+    // 3) juntar todos e remover duplicatas por _id (string)
+    const all = [...populatedThreads, ...fetchedThreads];
+    const map = new Map<string, any>();
+    for (const t of all) {
+      if (!t) continue;
+      const idStr = t._id ? String(t._id) : null;
+      if (!idStr) continue;
+      if (!map.has(idStr)) map.set(idStr, t);
+      // se tiver duplicata e quiser priorizar o populado, poderíamos atualizar aqui;
+      // mantemos o primeiro encontro (populatedThreads vem antes de fetchedThreads)
+    }
+
+    const uniqueThreads = Array.from(map.values());
+
+    // 4) substituir no objeto user e retornar no mesmo formato que o ThreadsTab espera
+    // (se você precisa do objeto Mongoose com métodos, em vez de plain object, remova o .lean() acima)
+    const userResult = { ...user, threads: uniqueThreads };
+
+    return userResult;
+  } catch (err) {
+    console.error("Erro ao buscar posts do usuário (fetchUserPosts):", err);
+    throw err;
   }
 }
 
@@ -156,31 +234,171 @@ export async function fetchUsers({
   }
 }
 
-export async function getActivity(userId: string) {
+export async function getActivity(userMongoId: string) {
   try {
     connectToDB();
 
-    // Find all threads created by the user
-    const userThreads = await Thread.find({ author: userId });
+    // 1) pegar todos os posts do usuário
+    const userThreads = await Thread.find({ author: userMongoId })
+      .populate({
+        path: "children",
+        populate: { path: "author", model: User, select: "name image _id id" },
+      })
+      .select("_id author text createdAt parentId likes children");
 
-    // Collect all the child thread ids (replies) from the 'children' field of each user thread
-    const childThreadIds = userThreads.reduce((acc, userThread) => {
-      return acc.concat(userThread.children);
-    }, []);
+    // 2) replies (mesma lógica)
+    const replies = userThreads.flatMap((thread) =>
+      thread.children.filter((child: any) => String(child.author._id) !== String(userMongoId))
+    );
 
-    // Find and return the child threads (replies) excluding the ones created by the same user
-    const replies = await Thread.find({
-      _id: { $in: childThreadIds },
-      author: { $ne: userId }, // Exclude threads authored by the same user
-    }).populate({
-      path: "author",
-      model: User,
-      select: "name image _id",
+    // 3) para likes: thread.likes contém Clerk ids (ex: 'user_...')
+    const likes = [];
+    for (const thread of userThreads) {
+      if (!Array.isArray(thread.likes) || thread.likes.length === 0) continue;
+      // buscar usuários por campo 'id' (Clerk id)
+      const usersWhoLiked = await User.find({ id: { $in: thread.likes } }).select("name image _id id");
+      // cada usuário vira uma activity
+      for (const u of usersWhoLiked) {
+        // ignore owner liking their own post if occurs (check clerk id vs stored)
+        if (String(u._id) === String(userMongoId)) continue;
+        likes.push({
+          _id: `${thread._id}-${u._id}`,
+          type: "like",
+          author: u,
+          parentId: thread._id,
+        });
+      }
+    }
+
+    const activity = [
+      ...replies.map((r: any) => ({ _id: r._id, type: "reply", author: r.author, parentId: r.parentId })),
+      ...likes,
+    ];
+
+    return activity;
+  } catch (err) {
+    console.error("Erro ao buscar atividades:", err);
+    throw err;
+  }
+}
+
+// 🧩 Alternar seguir/desseguir usuário (debug-friendly, usa Clerk IDs)
+export async function toggleFollow(authUserId: string, targetUserId: string, path: string) {
+  try {
+    await connectToDB();
+
+    console.log("toggleFollow called", { authUserId, targetUserId, path });
+
+    // não pode seguir a si mesmo
+    if (!authUserId || !targetUserId) {
+      console.warn("toggleFollow missing ids", { authUserId, targetUserId });
+      return { ok: false, reason: "missing-ids" };
+    }
+    if (authUserId === targetUserId) {
+      console.warn("toggleFollow: same user");
+      return { ok: false, reason: "self-follow" };
+    }
+
+    // busca ambos usuários pelo campo "id" (Clerk)
+    const currentUser = await User.findOne({ id: authUserId }).exec();
+    const targetUser = await User.findOne({ id: targetUserId }).exec();
+
+    console.log("toggleFollow found users", {
+      currentUserExists: !!currentUser,
+      targetUserExists: !!targetUser,
     });
 
-    return replies;
+    if (!currentUser || !targetUser) {
+      console.error("Usuário não encontrado no toggleFollow", { authUserId, targetUserId });
+      return { ok: false, reason: "user-not-found" };
+    }
+
+    // garante que os arrays existem
+    if (!Array.isArray(currentUser.following)) currentUser.following = [];
+    if (!Array.isArray(targetUser.followers)) targetUser.followers = [];
+
+    console.log("before arrays", {
+      following: currentUser.following.slice(0, 50),
+      followers: targetUser.followers.slice(0, 50),
+    });
+
+    // verifica se já está seguindo
+    const isFollowing = currentUser.following.includes(targetUserId);
+
+    if (isFollowing) {
+      // deixar de seguir
+      currentUser.following = currentUser.following.filter((id: string) => id !== targetUserId);
+      targetUser.followers = targetUser.followers.filter((id: string) => id !== authUserId);
+
+    } else {
+      // seguir
+      currentUser.following.push(targetUserId);
+      targetUser.followers.push(authUserId);
+      console.log("toggleFollow -> following");
+    }
+
+    await currentUser.save();
+    await targetUser.save();
+
+    console.log("after save arrays", {
+      following: currentUser.following.slice(0, 50),
+      followers: targetUser.followers.slice(0, 50),
+    });
+
+    // revalidate the route you passed
+    try {
+      revalidatePath(path);
+      console.log("revalidated path", path);
+    } catch (e) {
+      console.warn("revalidatePath failed:", e);
+    }
+
+    return { ok: true, following: !isFollowing };
+  } catch (error: any) {
+    console.error("Erro no toggleFollow:", error);
+    throw new Error("Falha ao seguir/deixar de seguir usuário");
+  }
+}
+
+// 🧲 Buscar lista de seguidores de um usuário
+export async function fetchFollowers(userId: string) {
+  try {
+    await connectToDB();
+
+    // Busca o usuário pelo id do Clerk
+    const user = await User.findOne({ id: userId }).select("followers");
+
+    if (!user) throw new Error("Usuário não encontrado");
+
+    // Busca os usuários correspondentes aos IDs em followers
+    const followers = await User.find({ id: { $in: user.followers } }).select(
+      "id name username image"
+    );
+
+    // Retorna JSON puro pra evitar problemas de serialização no Next
+    return JSON.parse(JSON.stringify(followers));
   } catch (error) {
-    console.error("Erro ao buscar comentários: ", error);
-    throw error;
+    console.error("Erro ao buscar seguidores:", error);
+    throw new Error("Falha ao buscar seguidores");
+  }
+}
+
+// 🧲 Buscar lista de usuários que o perfil segue
+export async function fetchFollowing(userId: string) {
+  try {
+    await connectToDB();
+
+    const user = await User.findOne({ id: userId }).select("following");
+
+    if (!user) throw new Error("Usuário não encontrado");
+
+    const following = await User.find({ id: { $in: user.following } }).select(
+      "id name username image"
+    );
+
+    return JSON.parse(JSON.stringify(following));
+  } catch (error) {
+    console.error("Erro ao buscar seguindo:", error);
+    throw new Error("Falha ao buscar seguindo");
   }
 }

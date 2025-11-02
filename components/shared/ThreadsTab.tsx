@@ -41,6 +41,7 @@ const ThreadsTab = async ({
                     community={thread.community} // TODO: Atualizar a comunidade
                     createdAt={thread.createdAt}
                     comments={thread.children}
+                    likes={thread.likes}
                 />
             ))}
         </section>

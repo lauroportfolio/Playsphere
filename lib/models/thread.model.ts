@@ -27,8 +27,19 @@ const threadSchema = new mongoose.Schema({
       ref: "Thread",
     },
   ],
+  // 🆕 Campo de likes com default []
+  likes: {
+    type: [String],
+    ref: "User",
+    default: [],
+  },
 });
 
-const Thread = mongoose.models.Thread || mongoose.model("Thread", threadSchema);
+// Força atualização do modelo se ele já existir com schema antigo
+if (mongoose.models.Thread) {
+  delete mongoose.models.Thread;
+}
+
+const Thread = mongoose.model("Thread", threadSchema);
 
 export default Thread;

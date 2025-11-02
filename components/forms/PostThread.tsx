@@ -82,7 +82,7 @@ function PostThread({ userId }: { userId: string }) {
                     )}
                 />
 
-                <Button type="submit" className="bg-primary-500">Publicar</Button>
+                <Button type="submit" className="cursor-pointer bg-primary-500">Publicar</Button>
             </form>
         </Form>
     )

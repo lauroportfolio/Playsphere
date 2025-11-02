@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-
 import { connectToDB } from "../mongoose";
 
 import User from "../models/user.model";
@@ -28,13 +27,14 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
       model: Community,
     })
     .populate({
-      path: "children", // Popula o campo filho
+      path: "children",
       populate: {
-        path: "author", // Popula o campo do autor dentro do campo filho
+        path: "author",
         model: User,
-        select: "_id name parentId image", // Seleciona apenas _id e username dos campos do autor
+        select: "_id name parentId image",
       },
-    });
+    })
+    .select("_id text author community children parentId createdAt likes"); // ✅ inclui likes
 
   // Count the total number of top-level posts (threads) i.e., threads that are not comments.
   const totalPostsCount = await Thread.countDocuments({
@@ -43,9 +43,11 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
 
   const posts = await postsQuery.exec();
 
+  const plainPosts = posts.map((post) => JSON.parse(JSON.stringify(post)));
+
   const isNext = totalPostsCount > skipAmount + posts.length;
 
-  return { posts, isNext };
+  return { posts: plainPosts, isNext };
 }
 
 interface Params {
@@ -55,8 +57,7 @@ interface Params {
   path: string,
 }
 
-export async function createThread({ text, author, communityId, path }: Params
-) {
+export async function createThread({ text, author, communityId, path }: Params) {
   try {
     connectToDB();
 
@@ -71,15 +72,15 @@ export async function createThread({ text, author, communityId, path }: Params
       community: communityIdObject, // Assign communityId if provided, or leave it null for personal account
     });
 
-    // Update User model
+    // em createThread, ao atualizar user:
     await User.findByIdAndUpdate(author, {
-      $push: { threads: createdThread._id },
+      $addToSet: { threads: createdThread._id }, // evita duplicatas
     });
 
     if (communityIdObject) {
       // Update Community model
       await Community.findByIdAndUpdate(communityIdObject, {
-        $push: { threads: createdThread._id },
+        $addToSet: { threads: createdThread._id },
       });
     }
 
@@ -94,7 +95,7 @@ async function fetchAllChildThreads(threadId: string): Promise<any[]> {
 
   const descendantThreads = [];
   for (const childThread of childThreads) {
-    const descendants = await fetchAllChildThreads(childThread._id);
+    const descendants = await fetchAllChildThreads(childThread._id.toString());
     descendantThreads.push(childThread, ...descendants);
   }
 
@@ -236,5 +237,164 @@ export async function addCommentToThread(
   } catch (err) {
     console.error("Erro ao adicionar comentário:", err);
     throw new Error("Não foi possível adicionar o comentário");
+  }
+}
+
+export async function toggleLike(threadId: string, userId: string, path: string) {
+  try {
+    await connectToDB();
+
+    const thread = await Thread.findById(threadId);
+    if (!thread) throw new Error("Post não encontrado");
+
+    // Garante que o campo likes sempre exista
+    if (!Array.isArray(thread.likes)) {
+      thread.likes = [];
+    }
+
+    const hasLiked = thread.likes.map(String).includes(String(userId));
+
+
+    if (hasLiked) {
+      thread.likes = thread.likes.filter((id: string) => id !== userId);
+    } else {
+      thread.likes.push(userId);
+    }
+
+    await thread.save();
+    revalidatePath(path);
+
+    return { liked: !hasLiked, likesCount: thread.likes.length };
+  } catch (err: any) {
+    console.error("Erro no toggleLike:", err);
+    throw new Error("Falha ao alternar like");
+  }
+}
+
+// 🔹 Buscar posts curtidos por um usuário específico (compatível com Clerk ID e ObjectId)
+export async function fetchLikedPosts(userId: string) {
+  try {
+    await connectToDB();
+
+    // 1️⃣ Busca o usuário correspondente (tanto por id do Clerk quanto _id do Mongo)
+    const user = await User.findOne({
+      $or: [{ id: userId }, { _id: userId }],
+    });
+
+    if (!user) {
+      console.warn("⚠️ Usuário não encontrado para likes:", userId);
+      return [];
+    }
+
+    // 2️⃣ Cria filtro compatível com ambos os formatos
+    const searchIds = [user._id.toString(), user.id]; // 👈 busca posts curtidos com qualquer dos dois formatos
+
+    // 3️⃣ Busca os posts curtidos (de forma decrescente)
+    const likedPosts = await Thread.find({ likes: { $in: searchIds } })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "author",
+        model: User,
+        select: "_id id name image",
+      })
+      .populate({
+        path: "community",
+        model: Community,
+        select: "_id id name image",
+      })
+      .populate({
+        path: "children",
+        model: Thread,
+        populate: {
+          path: "author",
+          model: User,
+          select: "_id id name image",
+        },
+      })
+      .select("_id text author community children parentId createdAt likes");
+
+    // 4️⃣ Retorna em formato puro
+    return likedPosts.map((post) => JSON.parse(JSON.stringify(post)));
+  } catch (error) {
+    console.error("Erro ao buscar posts curtidos:", error);
+    throw new Error("Falha ao buscar posts curtidos");
+  }
+}
+
+export async function fetchUserReplies(userId: string) {
+  try {
+    await connectToDB();
+
+    // Busca somente posts que são respostas (têm parentId válido)
+    const replies = await Thread.find({
+      author: userId,
+      parentId: { $nin: [null, undefined, "null", ""] }, // garante que só respostas reais venham
+    })
+      .populate({
+        path: "author",
+        model: User,
+        select: "_id id name image",
+      })
+      .populate({
+        path: "parentId",
+        model: Thread,
+        match: { parentId: { $in: [null, undefined, "null", ""] } }, // só parent real (post raiz)
+        populate: [
+          {
+            path: "author",
+            model: User,
+            select: "_id id name image",
+          },
+          {
+            path: "community",
+            model: Community,
+            select: "_id id name image",
+          },
+          {
+            path: "children",
+            model: Thread,
+            select: "_id",
+          },
+        ],
+      })
+      .sort({ createdAt: -1 }) // mais recente primeiro
+      .lean();
+
+    // Filtra apenas as respostas que têm um post pai válido (evita posts próprios)
+    const filteredReplies = replies.filter((reply: any) => {
+      const parent: any = reply.parentId;
+      return (
+        parent &&
+        typeof parent === "object" &&
+        parent.author &&
+        parent.author.id !== userId
+      );
+    });
+
+    return JSON.parse(JSON.stringify(filteredReplies));
+  } catch (error) {
+    console.error("Erro ao buscar respostas do usuário:", error);
+    throw new Error("Falha ao buscar respostas do usuário");
+  }
+}
+
+export async function fetchUserPostCount(clerkUserId: string) {
+  try {
+    await connectToDB();
+
+    // Busca o usuário no Mongo pelo id do Clerk
+    const user = await User.findOne({ id: clerkUserId });
+    if (!user) return 0;
+
+    // Conta apenas posts originais (sem parentId)
+    const postCount = await Thread.countDocuments({
+      author: user._id, // agora sim: ObjectId válido
+      parentId: { $in: [null, undefined, ""] },
+    });
+
+    return postCount;
+  } catch (err) {
+    console.error("Erro ao contar posts do usuário:", err);
+    return 0;
   }
 }
