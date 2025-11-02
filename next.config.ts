@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "uploadthing.com" },
       { protocol: "https", hostname: "placehold.co" },
       { protocol: "https", hostname: "5q51wo4dho.ufs.sh" }, // <--- adicionar o domínio que você recebeu do Clerk
+      { protocol: "https", hostname: "utfs.io" }, // ✅ novo domínio do UploadThing
     ],
   },
 };
