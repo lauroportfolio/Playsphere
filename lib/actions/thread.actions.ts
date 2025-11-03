@@ -158,43 +158,51 @@ export async function deleteThread(id: string, path: string): Promise<void> {
   }
 }
 
-export async function fetchThreadById(threadId: string) {
-  connectToDB();
+export async function fetchThreadById(threadId: string): Promise<any | null> {
+  await connectToDB();
 
   try {
     const thread = await Thread.findById(threadId)
+      .select("text author likes children createdAt parentId community") // ✅ inclui likes do post principal
       .populate({
         path: "author",
         model: User,
         select: "_id id name image",
-      }) // Populate the author field with _id and username
+      })
       .populate({
         path: "community",
         model: Community,
         select: "_id id name image",
-      }) // Populate the community field with _id and name
+      })
       .populate({
-        path: "children", // Populate the children field
+        path: "children",
+        model: Thread,
+        select: "text author likes children createdAt parentId", // ✅ likes
         populate: [
           {
-            path: "author", // Populate the author field within children
+            path: "author",
             model: User,
-            select: "_id id name parentId image", // Select only _id and username fields of the author
+            select: "_id id name image",
           },
           {
-            path: "children", // Populate the children field within children
-            model: Thread, // The model of the nested children (assuming it's the same "Thread" model)
+            path: "children",
+            model: Thread,
+            select: "text author likes children createdAt parentId", // ✅ likes novamente
             populate: {
-              path: "author", // Populate the author field within nested children
+              path: "author",
               model: User,
-              select: "_id id name parentId image", // Select only _id and username fields of the author
+              select: "_id id name image",
             },
           },
         ],
       })
+      .lean() // ✅ transforma em objeto puro (sem métodos mongoose)
       .exec();
 
-    return thread;
+    if (!thread) return null;
+
+    // ✅ converte para JSON puro (garante compatibilidade com Server Components)
+    return JSON.parse(JSON.stringify(thread));
   } catch (err) {
     console.error("Erro ao buscar postagem:", err);
     throw new Error("Não foi possível buscar o post");
@@ -210,35 +218,39 @@ export async function addCommentToThread(
   connectToDB();
 
   try {
-    // Find the original thread by its ID
+    // 🔹 Busca o post original
     const originalThread = await Thread.findById(threadId);
 
     if (!originalThread) {
       throw new Error("Post não encontrado");
     }
 
-    // Create the new comment thread
+    // 🔹 Cria o comentário
     const commentThread = new Thread({
       text: commentText,
       author: userId,
-      parentId: threadId, // Set the parentId to the original thread's ID
+      parentId: threadId,
     });
 
-    // Save the comment thread to the database
+    // 🔹 Salva o comentário
     const savedCommentThread = await commentThread.save();
 
-    // Add the comment thread's ID to the original thread's children array
+    // 🔹 Vincula ao post principal
     originalThread.children.push(savedCommentThread._id);
-
-    // Save the updated original thread to the database
     await originalThread.save();
 
-    revalidatePath(path);
+    await originalThread.save();
+
+    // ✅ Corrige o problema dos likes sumirem
+    revalidatePath(`/thread/${threadId}`, "page"); // força atualização da thread atual
+    revalidatePath(`/profile/${originalThread.author}`); // revalida perfil
+
   } catch (err) {
     console.error("Erro ao adicionar comentário:", err);
     throw new Error("Não foi possível adicionar o comentário");
   }
 }
+
 
 export async function toggleLike(threadId: string, userId: string, path: string) {
   try {
@@ -252,13 +264,25 @@ export async function toggleLike(threadId: string, userId: string, path: string)
       thread.likes = [];
     }
 
-    const hasLiked = thread.likes.map(String).includes(String(userId));
+    // Remove likes vazios residuais (limpa DB temporariamente em memória)
+    thread.likes = thread.likes.filter((id: string) => id && id.toString().trim() !== "");
 
+    // sanitize incoming userId: remove aspas extras e normalize to string
+    let sanitizedUserId = String(userId ?? "").trim();
+    // se veio com aspas por conta de JSON.stringify -> remove
+    sanitizedUserId = sanitizedUserId.replace(/^"+|"+$/g, "");
+
+    if (!sanitizedUserId) {
+      console.error("toggleLike: userId inválido recebido:", { original: userId, sanitized: sanitizedUserId });
+      throw new Error("ID do usuário inválido ao curtir");
+    }
+
+    const hasLiked = thread.likes.map(String).includes(sanitizedUserId);
 
     if (hasLiked) {
-      thread.likes = thread.likes.filter((id: string) => id !== userId);
+      thread.likes = thread.likes.filter((id: string) => String(id) !== sanitizedUserId);
     } else {
-      thread.likes.push(userId);
+      thread.likes.push(sanitizedUserId);
     }
 
     await thread.save();
@@ -271,7 +295,8 @@ export async function toggleLike(threadId: string, userId: string, path: string)
   }
 }
 
-// 🔹 Buscar posts curtidos por um usuário específico (compatível com Clerk ID e ObjectId)
+
+// 🔹 Buscar posts e comentários curtidos por um usuário específico (compatível com Clerk ID e ObjectId)
 export async function fetchLikedPosts(userId: string) {
   try {
     await connectToDB();
@@ -287,10 +312,12 @@ export async function fetchLikedPosts(userId: string) {
     }
 
     // 2️⃣ Cria filtro compatível com ambos os formatos
-    const searchIds = [user._id.toString(), user.id]; // 👈 busca posts curtidos com qualquer dos dois formatos
+    const searchIds = [user._id.toString(), user.id];
 
-    // 3️⃣ Busca os posts curtidos (de forma decrescente)
-    const likedPosts = await Thread.find({ likes: { $in: searchIds } })
+    // 3️⃣ Busca as threads curtidas (posts OU comentários)
+    const likedThreads = await Thread.find({
+      likes: { $in: searchIds },
+    })
       .sort({ createdAt: -1 })
       .populate({
         path: "author",
@@ -302,24 +329,45 @@ export async function fetchLikedPosts(userId: string) {
         model: Community,
         select: "_id id name image",
       })
+      // ✅ Popula o post original se o like for em um comentário
+      .populate({
+        path: "parentId",
+        model: Thread,
+        populate: [
+          {
+            path: "author",
+            model: User,
+            select: "_id id name image",
+          },
+          {
+            path: "community",
+            model: Community,
+            select: "_id id name image",
+          },
+        ],
+      })
+      // ✅ Popula também os filhos do post, para contagem de comentários
       .populate({
         path: "children",
         model: Thread,
+        select: "_id author text createdAt likes",
         populate: {
           path: "author",
           model: User,
           select: "_id id name image",
         },
       })
-      .select("_id text author community children parentId createdAt likes");
+      .lean();
 
-    // 4️⃣ Retorna em formato puro
-    return likedPosts.map((post) => JSON.parse(JSON.stringify(post)));
+    // 4️⃣ Garante que o resultado seja puro e seguro para SSR
+    return JSON.parse(JSON.stringify(likedThreads));
   } catch (error) {
     console.error("Erro ao buscar posts curtidos:", error);
     throw new Error("Falha ao buscar posts curtidos");
   }
 }
+
+
 
 export async function fetchUserReplies(userId: string) {
   try {

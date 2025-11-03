@@ -30,7 +30,6 @@ const threadSchema = new mongoose.Schema({
   // 🆕 Campo de likes com default []
   likes: {
     type: [String],
-    ref: "User",
     default: [],
   },
 });

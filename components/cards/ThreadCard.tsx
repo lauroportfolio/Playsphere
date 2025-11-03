@@ -13,6 +13,7 @@ import {
     AlertDialogCancel,
     AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+import ShareButton from "../shared/ShareButton";
 
 
 interface Props {
@@ -89,12 +90,18 @@ const ThreadCard = ({
 
                                 <div className="flex gap-3.5 items-center">
                                     {/* ❤️ CURTIR */}
+                                    {/* ❤️ CURTIR (funciona tanto para posts quanto para comentários) */}
                                     <form
                                         action={async () => {
                                             "use server";
                                             const { toggleLike } = await import("@/lib/actions/thread.actions");
-                                            // ✅ Usa o caminho dinâmico atual em vez de sempre "/"
-                                            const path = typeof window !== "undefined" ? window.location.pathname : "/";
+
+                                            // ✅ Se for comentário, revalida a página do post principal
+                                            const path =
+                                                typeof window !== "undefined"
+                                                    ? window.location.pathname
+                                                    : `/thread/${parentId || id}`;
+
                                             await toggleLike(id, currentUserId, path);
                                         }}
                                     >
@@ -113,6 +120,7 @@ const ThreadCard = ({
                                             <span className="text-gray-1 text-sm">{likes?.length || 0}</span>
                                         </button>
                                     </form>
+
 
                                     {/* 💬 COMENTÁRIOS */}
                                     <Link href={`/thread/${id}`}>
@@ -134,14 +142,8 @@ const ThreadCard = ({
                                         className="cursor-pointer object-contain"
                                     />
 
-                                    {/* 🔗 COMPARTILHAR (precisa ser feito) */}
-                                    <Image
-                                        src="/assets/share.svg"
-                                        alt="share"
-                                        width={24}
-                                        height={24}
-                                        className="cursor-pointer object-contain"
-                                    />
+                                    {/* 🔗 COMPARTILHAR (feito) */}
+                                    <ShareButton id={id?.toString()} />
 
                                 </div>
                                 {/* 🗑️ DELETE — sem useState, Server Component puro */}

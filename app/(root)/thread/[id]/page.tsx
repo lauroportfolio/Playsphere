@@ -5,6 +5,9 @@ import { fetchUser } from "@/lib/actions/user.actions";
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const Page = async ({ params }: { params: { id: string } }) => {
     // if (!params.id) return null;
     const { id } = await Promise.resolve(params); // alterado
@@ -16,7 +19,8 @@ const Page = async ({ params }: { params: { id: string } }) => {
     const userInfo = await fetchUser(user.id);
     if (!userInfo?.onboarded) redirect('/onboarding')
 
-    const thread = await fetchThreadById(id); // fetchThreadById(params.id)
+    const thread = await fetchThreadById(id);
+    if (!thread) return redirect("/");
 
     return (
         <section className="relative">
@@ -31,6 +35,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
                     community={thread.community}
                     createdAt={thread.createdAt}
                     comments={thread.children}
+                    likes={thread.likes} // ✅ adicione isto!
                 />
             </div>
 
@@ -38,7 +43,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
                 <Comment
                     threadId={thread.id}
                     currentUserImg={userInfo.image}
-                    currentUserId={JSON.stringify(userInfo._id)}
+                    currentUserId={user.id}   // <- Clerk ID, string como "user_..."
                 />
             </div>
 
@@ -47,7 +52,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
                     <ThreadCard
                         key={childItem._id}
                         id={childItem._id}
-                        currentUserId={childItem?.id || ""}
+                        currentUserId={user.id} // ✅ sempre o usuário logado (Clerk)
                         parentId={childItem.parentId}
                         content={childItem.text}
                         author={childItem.author}
@@ -55,6 +60,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
                         createdAt={childItem.createdAt}
                         comments={childItem.children}
                         isComment
+                        likes={childItem.likes || []} // ✅ garante contagem de likes dos comentários
                     />
                 ))}
             </div>
