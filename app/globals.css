@@ -1044,6 +1044,37 @@ main {
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
+/* ===== Scrollbar estilizada - PlaySphere ===== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0e0e10;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #6b63ff, #877EFF);
+  border-radius: 9999px;
+  border: 2px solid #0e0e10;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #7a73ff, #9a91ff);
+}
+
+::-webkit-scrollbar-corner {
+  background: #0e0e10;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #877EFF #0e0e10;
+}
+
+
 /* ---break---*/
 
 @layer base {

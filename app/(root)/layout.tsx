@@ -10,12 +10,12 @@ import Bottombar from "@/components/shared/Bottombar";
 import { dark } from "@clerk/themes";
 import { Toaster } from "sonner";
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "PlaySphere",
-  description: "Social Media App for REAL GAMERS"
-}
+  description: "Social Media App for REAL GAMERS",
+};
 
 export default function RootLayout({
   children,
@@ -23,14 +23,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider appearance={{
-      baseTheme: dark
-    }}
-      afterSignInUrl="/onboarding"   // ← novo usuários vão para onboarding
-      afterSignUpUrl="/onboarding"   // ← mesmo para cadastro
-      afterSignOutUrl="/onboarding"
-    >
-      <html lang="en">
+    <ClerkProvider appearance={{ baseTheme: dark }}>
+      <html lang="pt-BR">
         <body className={inter.className}>
           <Topbar />
 
@@ -38,9 +32,7 @@ export default function RootLayout({
             <LeftSidebar />
 
             <section className="main-container">
-              <div className="w-full max-w-4xl">
-                {children}
-              </div>
+              <div className="w-full max-w-4xl">{children}</div>
             </section>
 
             <RightSidebar />

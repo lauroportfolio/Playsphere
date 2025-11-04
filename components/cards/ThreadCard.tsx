@@ -13,6 +13,16 @@ import {
     AlertDialogCancel,
     AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import ShareButton from "../shared/ShareButton";
 
 
@@ -89,37 +99,70 @@ const ThreadCard = ({
                             <div className="flex items-center justify-between">
 
                                 <div className="flex gap-3.5 items-center">
-                                    {/* ❤️ CURTIR */}
                                     {/* ❤️ CURTIR (funciona tanto para posts quanto para comentários) */}
-                                    <form
-                                        action={async () => {
-                                            "use server";
-                                            const { toggleLike } = await import("@/lib/actions/thread.actions");
+                                    {currentUserId ? (
+                                        // 🔹 Usuário logado: pode curtir
+                                        <form
+                                            action={async () => {
+                                                "use server";
+                                                const { toggleLike } = await import("@/lib/actions/thread.actions");
+                                                const path = typeof window !== "undefined" ? window.location.pathname : "/";
+                                                await toggleLike(id, currentUserId, path);
+                                            }}
+                                        >
+                                            <button type="submit" className="flex items-center gap-1">
+                                                <Image
+                                                    src={
+                                                        likes?.includes(currentUserId)
+                                                            ? "/assets/heart-filled.svg"
+                                                            : "/assets/heart-gray.svg"
+                                                    }
+                                                    alt="like"
+                                                    width={24}
+                                                    height={24}
+                                                    className="cursor-pointer object-contain"
+                                                />
+                                                <span className="text-gray-1 text-sm">{likes?.length || 0}</span>
+                                            </button>
+                                        </form>
+                                    ) : (
+                                        // 🔹 Usuário deslogado: botão abre modal do shadcn
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    className="flex items-center gap-1 opacity-80 hover:opacity-100 transition"
+                                                    title="Entrar para curtir postagens"
+                                                >
+                                                    <Image
+                                                        src="/assets/heart-gray.svg"
+                                                        alt="like"
+                                                        width={24}
+                                                        height={24}
+                                                        className="cursor-pointer object-contain"
+                                                    />
+                                                    <span className="text-gray-1 text-sm">{likes?.length || 0}</span>
+                                                </button>
+                                            </DialogTrigger>
+                                            <DialogContent className="bg-dark-2 border-none text-light-1 max-w-sm">
+                                                <DialogHeader>
+                                                    <DialogTitle className="mb-5">Faça login para curtir postagens</DialogTitle>
+                                                    <DialogDescription className="text-light-2">
+                                                        Entre na sua conta PlaySphere para interagir com a comunidade.
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <DialogFooter>
+                                                    <Link
+                                                        href="/sign-in"
+                                                        className="w-full bg-primary-500 text-white py-2 rounded-md text-center hover:bg-primary-600 transition"
+                                                    >
+                                                        Entrar
+                                                    </Link>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    )}
 
-                                            // ✅ Se for comentário, revalida a página do post principal
-                                            const path =
-                                                typeof window !== "undefined"
-                                                    ? window.location.pathname
-                                                    : `/thread/${parentId || id}`;
-
-                                            await toggleLike(id, currentUserId, path);
-                                        }}
-                                    >
-                                        <button type="submit" className="flex items-center gap-1">
-                                            <Image
-                                                src={
-                                                    likes?.includes(currentUserId)
-                                                        ? "/assets/heart-filled.svg"
-                                                        : "/assets/heart-gray.svg"
-                                                }
-                                                alt="like"
-                                                width={24}
-                                                height={24}
-                                                className="cursor-pointer object-contain"
-                                            />
-                                            <span className="text-gray-1 text-sm">{likes?.length || 0}</span>
-                                        </button>
-                                    </form>
 
 
                                     {/* 💬 COMENTÁRIOS */}
