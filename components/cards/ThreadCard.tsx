@@ -15,15 +15,16 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+    Dialog,
+    DialogTrigger,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
 } from "@/components/ui/dialog";
 import ShareButton from "../shared/ShareButton";
+import LikeButton from "../shared/LikeButton";
 
 
 interface Props {
@@ -99,34 +100,18 @@ const ThreadCard = ({
                             <div className="flex items-center justify-between">
 
                                 <div className="flex gap-3.5 items-center">
-                                    {/* ❤️ CURTIR (funciona tanto para posts quanto para comentários) */}
+                                    {/* ❤️ CURTIR (com animação e verificação de login) */}
                                     {currentUserId ? (
-                                        // 🔹 Usuário logado: pode curtir
-                                        <form
-                                            action={async () => {
-                                                "use server";
-                                                const { toggleLike } = await import("@/lib/actions/thread.actions");
-                                                const path = typeof window !== "undefined" ? window.location.pathname : "/";
-                                                await toggleLike(id, currentUserId, path);
-                                            }}
-                                        >
-                                            <button type="submit" className="flex items-center gap-1">
-                                                <Image
-                                                    src={
-                                                        likes?.includes(currentUserId)
-                                                            ? "/assets/heart-filled.svg"
-                                                            : "/assets/heart-gray.svg"
-                                                    }
-                                                    alt="like"
-                                                    width={24}
-                                                    height={24}
-                                                    className="cursor-pointer object-contain"
-                                                />
-                                                <span className="text-gray-1 text-sm">{likes?.length || 0}</span>
-                                            </button>
-                                        </form>
+                                        // 🔹 Usuário logado: botão animado
+                                        <LikeButton
+                                            threadId={id.toString?.() || String(id)}
+                                            currentUserId={currentUserId}
+                                            isLiked={!!likes?.includes(currentUserId)}
+                                            likeCount={likes?.length || 0}
+                                        />
+
                                     ) : (
-                                        // 🔹 Usuário deslogado: botão abre modal do shadcn
+                                        // 🔹 Usuário deslogado: mostra modal para login
                                         <Dialog>
                                             <DialogTrigger asChild>
                                                 <button
@@ -146,7 +131,9 @@ const ThreadCard = ({
                                             </DialogTrigger>
                                             <DialogContent className="bg-dark-2 border-none text-light-1 max-w-sm">
                                                 <DialogHeader>
-                                                    <DialogTitle className="mb-5">Faça login para curtir postagens</DialogTitle>
+                                                    <DialogTitle className="mb-5">
+                                                        Faça login para curtir postagens
+                                                    </DialogTitle>
                                                     <DialogDescription className="text-light-2">
                                                         Entre na sua conta PlaySphere para interagir com a comunidade.
                                                     </DialogDescription>
@@ -162,9 +149,6 @@ const ThreadCard = ({
                                             </DialogContent>
                                         </Dialog>
                                     )}
-
-
-
                                     {/* 💬 COMENTÁRIOS */}
                                     <Link href={`/thread/${id}`}>
                                         <Image

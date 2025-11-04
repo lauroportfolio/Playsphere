@@ -23,7 +23,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider appearance={{ baseTheme: dark }}>
+    <ClerkProvider
+      appearance={{ baseTheme: dark }}
+      signInFallbackRedirectUrl="/redirect-after-login"
+      signUpFallbackRedirectUrl="/redirect-after-login"
+    >
       <html lang="pt-BR">
         <body className={inter.className}>
           <Topbar />

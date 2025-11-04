@@ -38,6 +38,13 @@ interface Props {
   btnTitle: string;
 }
 
+type UploadThingResult = {
+  ufsUrl?: string;
+  url?: string;
+  appUrl?: string;
+  fileUrl?: string;
+};
+
 const AccountProfile = ({ user, btnTitle }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -55,58 +62,58 @@ const AccountProfile = ({ user, btnTitle }: Props) => {
     },
   });
 
-  // checar aqui depois
   const onSubmit = async (values: z.infer<typeof UserValidation>) => {
-    const blob = values.profile_photo;
+    try {
+      const blob = values.profile_photo;
+      const hasImageChanged = isBase64Image(blob);
 
-    const hasImageChanged = isBase64Image(blob);
-    if (hasImageChanged) {
-      if (files && files.length > 0) {
+      if (hasImageChanged && files.length > 0) {
+        console.log("🧩 Iniciando upload da nova imagem...");
+
         const imgRes = await startUpload(files);
 
         if (!imgRes || imgRes.length === 0) {
-          console.error("⚠️ Falha no upload: resposta vazia do UploadThing");
+          console.error("⚠️ UploadThing retornou resposta vazia:", imgRes);
           toast.error("Falha ao enviar imagem. Tente novamente.");
           return;
         }
 
-        if (imgRes?.[0]?.url) {
-          values.profile_photo = imgRes[0].url;
+        const fileData = imgRes[0] as UploadThingResult;
+        const uploadedUrl =
+          fileData.ufsUrl || fileData.url || fileData.appUrl || fileData.fileUrl;
+
+        if (!uploadedUrl) {
+          console.error("⚠️ Nenhuma URL válida encontrada no resultado:", fileData);
+          toast.error("Erro ao processar imagem. Tente novamente.");
+          return;
         }
+
+        // ✅ URL do arquivo obtida com sucesso
+        console.log("✅ Upload bem-sucedido:", uploadedUrl);
+        values.profile_photo = uploadedUrl;
       }
-    }
 
-    /*const onSubmit = async (values: z.infer<typeof UserValidation>) => {
-      let imageUrl = user.image; // Começa com a URL antiga
-  
-      // Se o usuário selecionou uma nova imagem, faz upload
-      if (files.length > 0) {
-        try {
-          const uploadRes = await startUpload(files);
-          if (uploadRes && uploadRes[0]) {
-            imageUrl = uploadRes[0].ufsUrl ?? uploadRes[0].url;
-            console.log("✅ Upload concluído:", imageUrl);
-          }
-        } catch (error) {
-          console.error("❌ Erro ao enviar imagem:", error);
-        }
-      }*/
-    // checar aqui depois
+      // 🔹 Atualiza o usuário no banco
+      await updateUser({
+        name: values.name,
+        username: values.username,
+        userId: user.id,
+        bio: values.bio,
+        image: values.profile_photo,
+        path: pathname,
+      });
 
-    // Atualiza o usuário no MongoDB
-    await updateUser({
-      name: values.name,
-      path: pathname,
-      username: values.username,
-      userId: user.id,
-      bio: values.bio,
-      image: values.profile_photo,
-    });
+      toast.success("Perfil atualizado com sucesso! 🚀");
 
-    if (pathname === "/profile/edit") {
-      router.back();
-    } else {
-      router.push("/");
+      // 🔹 Redireciona
+      if (pathname === "/profile/edit") {
+        router.back();
+      } else {
+        router.push("/");
+      }
+    } catch (error) {
+      console.error("❌ Erro ao atualizar perfil:", error);
+      toast.error("Falha ao atualizar perfil. Tente novamente.");
     }
   };
 

@@ -1,19 +1,23 @@
 import { currentUser } from "@clerk/nextjs/server";
-import { fetchUser } from "@/lib/actions/user.actions";
 import { redirect } from "next/navigation";
+import { fetchUser } from "@/lib/actions/user.actions";
 
 export default async function RedirectAfterLoginPage() {
   const user = await currentUser();
 
-  // se por algum motivo o usuário não existir
   if (!user) redirect("/sign-in");
 
-  // verifica se já completou o onboarding
-  const userInfo = await fetchUser(user.id);
+  const existingUser = await fetchUser(user.id);
 
-  if (userInfo?.onboarded) {
-    redirect("/"); // ✅ volta pra home
-  } else {
-    redirect("/onboarding"); // 🧭 vai pra onboarding se for novo
+  if (!existingUser) {
+    // cria um novo usuário se ainda não existir
+    redirect("/onboarding");
   }
+
+  // ⚡ evita redirecionamento em loop
+  if (existingUser.onboarded === false) {
+    redirect("/onboarding");
+  }
+
+  redirect("/");
 }
