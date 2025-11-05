@@ -23,33 +23,38 @@ import {
     DialogDescription,
     DialogFooter,
 } from "@/components/ui/dialog";
+
 import ShareButton from "../shared/ShareButton";
 import LikeButton from "../shared/LikeButton";
+import RepostButton from "../shared/RepostButton";
+import DeleteButton from "../shared/DeleteButton";
 
+interface UserLite {
+    id?: string;
+    _id?: any;
+    name?: string;
+    username?: string;
+    image?: string;
+}
 
 interface Props {
     id: string;
     currentUserId: string;
     parentId: string | null;
     content: string;
-    author: {
-        name: string;
-        image: string;
-        id: string;
-    };
+    author: UserLite;
     community: {
         id: string;
         name: string;
         image: string;
     } | null;
     createdAt: string;
-    comments: {
-        author: {
-            image: string;
-        };
-    }[];
+    comments: any[];
     isComment?: boolean;
     likes?: string[];
+    reposts?: any[];
+    repostOf?: any | null;
+    repostedBy?: UserLite | null;
 }
 
 const ThreadCard = ({
@@ -62,56 +67,142 @@ const ThreadCard = ({
     createdAt,
     comments,
     isComment,
-    likes,
+    likes = [],
+    reposts = [],
+    repostOf = null,
+    repostedBy = null,
 }: Props) => {
-    // 🔹 Verifica se o usuário atual é o autor do post
-    const isAuthor = currentUserId === author.id;
+    const isRepostThread = Boolean(repostOf);
+    const repostCount = reposts?.length || 0;
+
+    const displayPost = isRepostThread
+        ? repostOf
+        : { text: content, author, createdAt, community, likes, children: comments };
+
+    const displayAuthor: UserLite =
+        displayPost?.author || author || { id: "", name: "Usuário", image: "" };
+
+    const repostedByUser: UserLite | null =
+        repostedBy ||
+        (isRepostThread
+            ? {
+                id: String(
+                    displayPost?.repostedBy?._id || displayPost?.repostedBy?.id
+                ),
+                name: displayPost?.repostedBy?.name,
+                username: displayPost?.repostedBy?.username,
+                image: displayPost?.repostedBy?.image,
+            }
+            : null);
+
+    const hasLiked = !!displayPost?.likes?.map?.(String).includes?.(
+        String(currentUserId)
+    );
+    const canRepost = !isRepostThread && Boolean(currentUserId);
+    const isAuthorOfThisThread = currentUserId === author?.id;
 
     return (
         <article
-            className={`flex w-full flex-col rounded-xl ${isComment ? "px-0 xs-px-7" : " bg-dark-2 p-7"
+            className={`flex w-full flex-col rounded-xl ${isComment ? "px-0 xs:px-7" : "bg-dark-2 p-7"
                 }`}
         >
+            {/* 🔁 Barra “Repostado por” */}
+            {isRepostThread && repostedByUser && (
+                <div className="mb-3 flex items-center gap-2 text-sm text-gray-400">
+                    <Image
+                        src={repostedByUser.image || "/assets/default-profile.png"}
+                        alt={repostedByUser.name || "Reposter"}
+                        width={18}
+                        height={18}
+                        className="rounded-full object-cover"
+                    />
+                    <p>
+                        Repostado por{" "}
+                        <Link
+                            href={`/profile/${repostedByUser.id}`}
+                            className="text-[#877EFF]"
+                        >
+                            @{repostedByUser.username ?? repostedByUser.id}
+                        </Link>
+                    </p>
+                </div>
+            )}
+
+            {/* 🧱 Corpo do Post */}
             <div className="flex items-start justify-between">
                 <div className="flex w-full flex-row gap-4">
                     <div className="flex flex-col items-center">
-                        <Link href={`/profile/${author.id}`} className="relative h-11 w-11">
+                        <Link
+                            href={`/profile/${displayAuthor.id || displayAuthor._id}`}
+                            className="relative h-11 w-11"
+                        >
                             <Image
-                                src={author.image}
-                                alt="Profile Image"
+                                src={displayAuthor.image || "/assets/default-profile.png"}
+                                alt={displayAuthor.name || "Profile Image"}
                                 fill
                                 className="cursor-pointer rounded-full object-cover"
                             />
                         </Link>
-
                         <div className="thread-card_bar" />
                     </div>
 
                     <div className="flex w-full flex-col">
-                        <Link href={`/profile/${author.id}`} className="w-fit">
+                        <Link
+                            href={`/profile/${displayAuthor.id || displayAuthor._id}`}
+                            className="w-fit"
+                        >
                             <h4 className="cursor-pointer base-semibold text-light-1">
-                                {author.name}
+                                {displayAuthor.name}
                             </h4>
                         </Link>
 
-                        <p className="mt-2 small-regular text-light-2">{content}</p>
+                        <p className="mt-2 small-regular text-light-2">
+                            {displayPost.text}
+                        </p>
 
-                        <div className={`${isComment && "mb-10"} mt-5 flex flex-col gap-3`}>
+                        <div
+                            className={`${isComment ? "mb-10" : ""
+                                } mt-5 flex flex-col gap-3`}
+                        >
+                            {/* 🔘 Ações */}
                             <div className="flex items-center justify-between">
-
-                                <div className="flex gap-3.5 items-center">
-                                    {/* ❤️ CURTIR (com animação e verificação de login) */}
+                                <div className="flex items-center gap-2.5">
+                                    {/* ❤️ CURTIR */}
                                     {currentUserId ? (
-                                        // 🔹 Usuário logado: botão animado
-                                        <LikeButton
-                                            threadId={id.toString?.() || String(id)}
-                                            currentUserId={currentUserId}
-                                            isLiked={!!likes?.includes(currentUserId)}
-                                            likeCount={likes?.length || 0}
-                                        />
-
+                                        <form
+                                            action={async () => {
+                                                "use server";
+                                                const { toggleLike } = await import(
+                                                    "@/lib/actions/thread.actions"
+                                                );
+                                                const path =
+                                                    typeof window !== "undefined"
+                                                        ? window.location.pathname
+                                                        : "/";
+                                                await toggleLike(id, currentUserId, path);
+                                            }}
+                                        >
+                                            <button
+                                                type="submit"
+                                                className="flex items-center gap-1 align-middle"
+                                            >
+                                                <Image
+                                                    src={
+                                                        hasLiked
+                                                            ? "/assets/heart-filled.svg"
+                                                            : "/assets/heart-gray.svg"
+                                                    }
+                                                    alt="like"
+                                                    width={24}
+                                                    height={24}
+                                                    className="cursor-pointer object-contain"
+                                                />
+                                                <span className="text-gray-1 text-sm">
+                                                    {displayPost?.likes?.length ?? 0}
+                                                </span>
+                                            </button>
+                                        </form>
                                     ) : (
-                                        // 🔹 Usuário deslogado: mostra modal para login
                                         <Dialog>
                                             <DialogTrigger asChild>
                                                 <button
@@ -126,7 +217,9 @@ const ThreadCard = ({
                                                         height={24}
                                                         className="cursor-pointer object-contain"
                                                     />
-                                                    <span className="text-gray-1 text-sm">{likes?.length || 0}</span>
+                                                    <span className="text-gray-1 text-sm">
+                                                        {displayPost?.likes?.length ?? 0}
+                                                    </span>
                                                 </button>
                                             </DialogTrigger>
                                             <DialogContent className="bg-dark-2 border-none text-light-1 max-w-sm">
@@ -135,7 +228,8 @@ const ThreadCard = ({
                                                         Faça login para curtir postagens
                                                     </DialogTitle>
                                                     <DialogDescription className="text-light-2">
-                                                        Entre na sua conta PlaySphere para interagir com a comunidade.
+                                                        Entre na sua conta PlaySphere para interagir com a
+                                                        comunidade.
                                                     </DialogDescription>
                                                 </DialogHeader>
                                                 <DialogFooter>
@@ -149,6 +243,7 @@ const ThreadCard = ({
                                             </DialogContent>
                                         </Dialog>
                                     )}
+
                                     {/* 💬 COMENTÁRIOS */}
                                     <Link href={`/thread/${id}`}>
                                         <Image
@@ -160,21 +255,44 @@ const ThreadCard = ({
                                         />
                                     </Link>
 
-                                    {/* 🔁 REPOSTAR (precisa ser feito) */}
-                                    <Image
-                                        src="/assets/repost.svg"
-                                        alt="repost"
-                                        width={24}
-                                        height={24}
-                                        className="cursor-pointer object-contain"
-                                    />
+                                    {/* 🔁 REPOST */}
+                                    {canRepost ? (
+                                        <RepostButton
+                                            threadId={id.toString?.() || String(id)}
+                                            currentUserId={currentUserId}
+                                            isReposted={!!reposts?.some(
+                                                (r: any) =>
+                                                    r === currentUserId ||
+                                                    r?._id === currentUserId ||
+                                                    r?.id === currentUserId
+                                            )}
+                                            initialCount={repostCount}
+                                        />
+                                    ) : (
+                                        repostCount > 0 && (
+                                            <div className="flex items-center gap-1 align-middle">
+                                                <Image
+                                                    src="/assets/repost.svg"
+                                                    alt="repost"
+                                                    width={18}
+                                                    height={18}
+                                                    className="opacity-70"
+                                                />
+                                                <span className="text-gray-1 text-sm">
+                                                    {repostCount}
+                                                </span>
+                                            </div>
+                                        )
+                                    )}
 
-                                    {/* 🔗 COMPARTILHAR (feito) */}
-                                    <ShareButton id={id?.toString()} />
-
+                                    {/* 🔗 COMPARTILHAR */}
+                                    <div className="flex items-center gap-1 align-middle">
+                                        <ShareButton id={id.toString()} />
+                                    </div>
                                 </div>
-                                {/* 🗑️ DELETE — sem useState, Server Component puro */}
-                                {isAuthor && (
+
+                                {/* 🗑️ DELETE */}
+                                {isAuthorOfThisThread && (
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <button
@@ -200,33 +318,24 @@ const ThreadCard = ({
                                                     Essa ação é irreversível e removerá também todos os comentários vinculados.
                                                 </AlertDialogDescription>
                                             </AlertDialogHeader>
+
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel className="cursor-pointer bg-dark-2 hover:bg-dark-1 text-light-2">
                                                     Cancelar
                                                 </AlertDialogCancel>
 
-                                                {/* 🔥 Botão que executa a action do servidor */}
-                                                <form
-                                                    action={async () => {
-                                                        "use server";
-                                                        const { deleteThread } = await import("@/lib/actions/thread.actions");
-                                                        await deleteThread(id, "/");
-                                                    }}
-                                                >
-                                                    <AlertDialogAction
-                                                        type="submit"
-                                                        className="cursor-pointer bg-red-600 hover:bg-red-700 text-white"
-                                                    >
-                                                        Excluir
-                                                    </AlertDialogAction>
-                                                </form>
+                                                {/* ✅ Novo botão de deletar com refresh automático */}
+                                                <DeleteButton
+                                                    threadId={id?.toString?.() || String(id)}
+                                                    className="cursor-pointer bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+                                                />
                                             </AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>
                                 )}
-
                             </div>
 
+                            {/* 📣 Contador de respostas */}
                             {isComment && comments.length > 0 && (
                                 <Link href={`/thread/${id}`}>
                                     <p className="mt-1 subtle-medium text-gray-1">
@@ -239,15 +348,20 @@ const ThreadCard = ({
                 </div>
             </div>
 
-            {!isComment && community && (
-                <Link href={`/communities/${community.id}`} className="mt-5 flex items-center">
+            {/* 📍 Rodapé - Comunidade */}
+            {!isComment && displayPost.community && (
+                <Link
+                    href={`/communities/${displayPost.community.id}`}
+                    className="mt-5 flex items-center"
+                >
                     <p className="subtle-medium text-gray-1">
-                        {formatDateString(createdAt)} - Comunidade {community.name}
+                        {formatDateString(displayPost.createdAt || createdAt)} - Comunidade{" "}
+                        {displayPost.community.name}
                     </p>
 
                     <Image
-                        src={community.image}
-                        alt={community.name}
+                        src={displayPost.community.image}
+                        alt={displayPost.community.name}
                         width={14}
                         height={14}
                         className="ml-1 rounded-full object-cover"

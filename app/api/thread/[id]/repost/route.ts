@@ -1,47 +1,83 @@
-// app/api/thread/[id]/repost/route.ts
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDB } from "@/lib/mongoose";
 import Thread from "@/lib/models/thread.model";
 import User from "@/lib/models/user.model";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id: threadId } = params;
+    // ✅ Corrige acesso assíncrono aos params (Next.js 14+)
+    const { id: threadId } = await context.params;
+    await connectToDB();
+
     const body = await request.json();
     const { userId } = body;
-    if (!userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    if (!userId)
+      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
 
-    connectToDB();
+    // ✅ Garante que só tenta usar _id se for ObjectId válido
+    const query: any = [{ id: userId }];
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      query.push({ _id: new mongoose.Types.ObjectId(userId) });
+    }
 
+    const user = await User.findOne({ $or: query });
+    if (!user)
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    const userOid = user._id;
     const original = await Thread.findById(threadId);
-    if (!original) return NextResponse.json({ error: "Original thread not found" }, { status: 404 });
+    if (!original)
+      return NextResponse.json(
+        { error: "Original thread not found" },
+        { status: 404 }
+      );
 
-    const alreadyReposted = original.reposts.some((id: any) => id.toString() === userId);
+    const hasReposted = original.reposts.some(
+      (r: any) => String(r) === String(userOid)
+    );
 
-    if (alreadyReposted) {
-      original.reposts = original.reposts.filter((id: any) => id.toString() !== userId);
+    if (hasReposted) {
+      // ✅ Desfazer repost
+      original.reposts = original.reposts.filter(
+        (r: any) => String(r) !== String(userOid)
+      );
       await original.save();
 
-      await Thread.deleteOne({ repostId: original._id, author: userId });
+      // Remove documento de repost criado antes
+      await Thread.deleteOne({ repostOf: original._id, author: userOid });
 
-      return NextResponse.json({ success: true, action: "unrepost", repostsCount: original.reposts.length });
+      return NextResponse.json({
+        success: true,
+        action: "unrepost",
+        repostsCount: original.reposts.length,
+      });
     } else {
-      original.reposts.push(userId);
+      // ✅ Criar repost
+      original.reposts.push(userOid);
       await original.save();
 
-      const repostThread = await Thread.create({
+      const repost = await Thread.create({
         text: original.text,
-        author: userId,
+        author: userOid,
         community: original.community || null,
-        repostId: original._id,
+        repostOf: original._id,
+        repostedBy: userOid,
       });
 
-      await User.findByIdAndUpdate(userId, { $push: { threads: repostThread._id } });
+      await User.findByIdAndUpdate(userOid, { $push: { threads: repost._id } });
 
-      return NextResponse.json({ success: true, action: "repost", repostsCount: original.reposts.length });
+      return NextResponse.json({
+        success: true,
+        action: "repost",
+        repostsCount: original.reposts.length,
+      });
     }
   } catch (err: any) {
-    console.error(err);
+    console.error("Erro no repost route:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
