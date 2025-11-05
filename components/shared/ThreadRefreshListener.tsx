@@ -17,7 +17,7 @@ export default function ThreadRefreshListener() {
     // 🔁 Atualiza também a cada 30s como fallback
     const timer = setInterval(() => {
       router.refresh();
-    }, 10000);
+    }, 30000);
 
     return () => {
       window.removeEventListener("thread:refresh", handleRefresh);
