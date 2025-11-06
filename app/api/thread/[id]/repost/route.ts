@@ -18,10 +18,10 @@ export async function POST(
     if (!userId)
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
 
-    // ✅ Garante que só tenta usar _id se for ObjectId válido
+    // ✅ Busca o usuário pelo id do Clerk ou ObjectId do Mongo
     const query: any = [{ id: userId }];
     if (mongoose.Types.ObjectId.isValid(userId)) {
-      query.push({ _id: new mongoose.Types.ObjectId(userId) });
+      query.push({ _id: new mongoose.Schema.Types.ObjectId(userId) });
     }
 
     const user = await User.findOne({ $or: query });
@@ -29,6 +29,8 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const userOid = user._id;
+
+    // ✅ Busca o post original
     const original = await Thread.findById(threadId);
     if (!original)
       return NextResponse.json(
@@ -41,14 +43,13 @@ export async function POST(
     );
 
     if (hasReposted) {
-      // ✅ Desfazer repost
+      // 🔁 Desfaz repost (remove usuário do array de reposts)
       original.reposts = original.reposts.filter(
         (r: any) => String(r) !== String(userOid)
       );
       await original.save();
 
-      // Remove documento de repost criado antes
-      await Thread.deleteOne({ repostOf: original._id, author: userOid });
+      console.log(`🟡 Repost removido: ${user.id} → ${threadId}`);
 
       return NextResponse.json({
         success: true,
@@ -56,19 +57,11 @@ export async function POST(
         repostsCount: original.reposts.length,
       });
     } else {
-      // ✅ Criar repost
+      // 🔁 Faz repost (adiciona o usuário no array)
       original.reposts.push(userOid);
       await original.save();
 
-      const repost = await Thread.create({
-        text: original.text,
-        author: userOid,
-        community: original.community || null,
-        repostOf: original._id,
-        repostedBy: userOid,
-      });
-
-      await User.findByIdAndUpdate(userOid, { $push: { threads: repost._id } });
+      console.log(`🟢 Repost criado: ${user.id} → ${threadId}`);
 
       return NextResponse.json({
         success: true,

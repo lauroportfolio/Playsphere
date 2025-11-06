@@ -236,30 +236,35 @@ export async function fetchUsers({
 
 export async function getActivity(userMongoId: string) {
   try {
-    connectToDB();
+    await connectToDB();
 
-    // 1) pegar todos os posts do usuário
+    // 1️⃣ Buscar todos os posts do usuário
     const userThreads = await Thread.find({ author: userMongoId })
       .populate({
         path: "children",
         populate: { path: "author", model: User, select: "name image _id id" },
       })
-      .select("_id author text createdAt parentId likes children");
+      .select("_id author text createdAt parentId likes children reposts");
 
-    // 2) replies (mesma lógica)
+    // 2️⃣ Filtrar replies (comentários de outras pessoas)
     const replies = userThreads.flatMap((thread) =>
-      thread.children.filter((child: any) => String(child.author._id) !== String(userMongoId))
+      thread.children.filter(
+        (child: any) => String(child.author._id) !== String(userMongoId)
+      )
     );
 
-    // 3) para likes: thread.likes contém Clerk ids (ex: 'user_...')
-    const likes = [];
+    // 3️⃣ Montar atividades de curtidas
+    const likes: any[] = [];
     for (const thread of userThreads) {
       if (!Array.isArray(thread.likes) || thread.likes.length === 0) continue;
-      // buscar usuários por campo 'id' (Clerk id)
-      const usersWhoLiked = await User.find({ id: { $in: thread.likes } }).select("name image _id id");
-      // cada usuário vira uma activity
+
+      // Buscar usuários que curtiram (Clerk IDs)
+      const usersWhoLiked = await User.find({
+        id: { $in: thread.likes },
+      }).select("name image _id id");
+
       for (const u of usersWhoLiked) {
-        // ignore owner liking their own post if occurs (check clerk id vs stored)
+        // Ignorar o próprio usuário curtindo o próprio post
         if (String(u._id) === String(userMongoId)) continue;
         likes.push({
           _id: `${thread._id}-${u._id}`,
@@ -270,16 +275,66 @@ export async function getActivity(userMongoId: string) {
       }
     }
 
+    // 4️⃣ Montar atividades de reposts
+    const reposts: any[] = [];
+    for (const thread of userThreads) {
+      if (!Array.isArray(thread.reposts) || thread.reposts.length === 0)
+        continue;
+
+      // Buscar usuários que repostaram
+      const usersWhoReposted = await User.find({
+        _id: { $in: thread.reposts },
+      }).select("name image _id id");
+
+      for (const u of usersWhoReposted) {
+        // Ignorar o dono repostando o próprio post
+        if (String(u._id) === String(userMongoId)) continue;
+        reposts.push({
+          _id: `${thread._id}-repost-${u._id}`,
+          type: "repost",
+          author: u,
+          parentId: thread._id,
+        });
+      }
+    }
+
+    // 5️⃣ Unir todas as atividades
     const activity = [
-      ...replies.map((r: any) => ({ _id: r._id, type: "reply", author: r.author, parentId: r.parentId })),
+      ...replies.map((r: any) => ({
+        _id: r._id,
+        type: "reply",
+        author: r.author,
+        parentId: r.parentId,
+      })),
       ...likes,
+      ...reposts,
     ];
+
+    // 6️⃣ Ordenar (opcional — mais recentes primeiro)
+    activity.sort((a, b) => (a._id < b._id ? 1 : -1));
 
     return activity;
   } catch (err) {
     console.error("Erro ao buscar atividades:", err);
     throw err;
   }
+}
+
+// 🔹 Atualiza o contador de notificações locais
+export async function incrementLocalNotificationCount() {
+  if (typeof window === "undefined") return;
+  const current = parseInt(localStorage.getItem("unreadCount") || "0", 10);
+  localStorage.setItem("unreadCount", String(current + 1));
+
+  // emite evento global (para Sidebar e Bottombar)
+  window.dispatchEvent(new Event("notifications:update"));
+}
+
+// 🔹 Zera o contador de notificações locais
+export async function resetLocalNotificationCount() {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("unreadCount", "0");
+  window.dispatchEvent(new Event("notifications:update"));
 }
 
 // 🧩 Alternar seguir/desseguir usuário (debug-friendly, usa Clerk IDs)
@@ -400,5 +455,70 @@ export async function fetchFollowing(userId: string) {
   } catch (error) {
     console.error("Erro ao buscar seguindo:", error);
     throw new Error("Falha ao buscar seguindo");
+  }
+}
+
+// 🔹 Contador de notificações não lidas
+export async function getUnreadActivityCount(userMongoId: string) {
+  try {
+    await connectToDB();
+
+    const activities = await Thread.aggregate([
+      { $match: { author: new mongoose.Types.ObjectId(userMongoId) } },
+      {
+        $project: {
+          unreadReplies: {
+            $size: {
+              $filter: {
+                input: "$children",
+                as: "child",
+                cond: { $ne: ["$$child.isRead", true] },
+              },
+            },
+          },
+          unreadLikes: {
+            $cond: [
+              { $gt: [{ $size: "$likes" }, 0] },
+              { $size: "$likes" },
+              0,
+            ],
+          },
+        },
+      },
+    ]);
+
+    const total = activities.reduce(
+      (acc, a) => acc + (a.unreadReplies || 0) + (a.unreadLikes || 0),
+      0
+    );
+
+    return total;
+  } catch (error) {
+    console.error("Erro ao buscar contador de notificações:", error);
+    return 0;
+  }
+}
+
+// 🔹 Marca todas as atividades como lidas
+export async function markActivitiesAsRead(userMongoId: string) {
+  try {
+    await connectToDB();
+
+    // Encontra todos os posts do usuário
+    const userThreads = await Thread.find({ author: userMongoId });
+
+    // Marca todos os filhos (respostas) desses posts como "lidos"
+    for (const thread of userThreads) {
+      await Thread.updateMany(
+        { _id: { $in: thread.children } },
+        { $set: { isRead: true } }
+      );
+    }
+
+    // Aqui futuramente podemos incluir likes e reposts se forem armazenados separadamente
+    return true;
+  } catch (error) {
+    console.error("Erro ao marcar atividades como lidas:", error);
+    return false;
   }
 }

@@ -40,10 +40,12 @@ const Comment = ({ threadId, currentUserImg, currentUserId }: Props) => {
     });
 
     const onSubmit = async (values: z.infer<typeof CommentValidation>) => {
+        console.log("🧩 Comment Debug:", { threadId, currentUserId, pathname });
+
         await addCommentToThread(
             threadId,
             values.thread,
-            JSON.parse(currentUserId),
+            currentUserId,
             pathname
         );
 
@@ -74,7 +76,7 @@ const Comment = ({ threadId, currentUserImg, currentUserId }: Props) => {
                                 <Input
                                     type="text"
                                     placeholder="Responder..."
-                                    className="not-focus text-light-1 outline-none"
+                                    className="no-focus text-light-1 outline-none"
                                     {...field}
                                 />
                             </FormControl>
@@ -82,7 +84,7 @@ const Comment = ({ threadId, currentUserImg, currentUserId }: Props) => {
                     )}
                 />
 
-                <Button type="submit" className="comment-form_btn">Enviar</Button>
+                <Button type="submit" className="cursor-pointer comment-form_btn">Enviar</Button>
             </form>
         </Form>
     )

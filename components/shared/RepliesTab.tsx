@@ -9,6 +9,18 @@ interface Props {
 const RepliesTab = async ({ userId, currentUserId }: Props) => {
   const replies = await fetchUserReplies(userId);
 
+  // Log servidor para debug — verifique no terminal do Next.js
+  console.log("RepliesTab debug — currentUserId:", currentUserId);
+  console.log(
+    "RepliesTab debug — replies parent reposts sample:",
+    replies.slice(0, 5).map((r: any) => ({
+      replyId: r._id,
+      parentId: r.parentId?._id,
+      parentReposts: r.parentId?.reposts || [],
+      replyReposts: r.reposts || [],
+    }))
+  );
+
   if (!replies || replies.length === 0) {
     return <p className="text-gray-1 mt-4">Nenhuma resposta ainda.</p>;
   }
@@ -30,6 +42,10 @@ const RepliesTab = async ({ userId, currentUserId }: Props) => {
               comments={reply.parentId.children}
               isComment={false}
               likes={reply.parentId.likes || []}
+              // já normalizados no fetchUserReplies
+              reposts={reply.parentId.reposts || []}
+              repostOf={reply.parentId.repostOf || null}
+              repostedBy={reply.parentId.repostedBy || null}
             />
           )}
 
@@ -46,6 +62,9 @@ const RepliesTab = async ({ userId, currentUserId }: Props) => {
               comments={reply.children || []}
               isComment
               likes={reply.likes || []}
+              reposts={reply.reposts || []}
+              repostOf={reply.repostOf || null}
+              repostedBy={reply.repostedBy || null}
             />
           </div>
         </div>

@@ -6,12 +6,15 @@ import { connectToDB } from "../mongoose";
 import User from "../models/user.model";
 import Thread from "../models/thread.model";
 import Community from "../models/community.model";
+import mongoose from "mongoose";
+import Activity from "../models/activity.model";
 
 export async function fetchPosts(pageNumber = 1, pageSize = 20) {
   await connectToDB();
 
   const skipAmount = (pageNumber - 1) * pageSize;
 
+  // Busca os posts originais
   const postsQuery = Thread.find({ parentId: { $in: [null, undefined] } })
     .sort({ createdAt: -1 })
     .skip(skipAmount)
@@ -26,19 +29,16 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
       model: Community,
       select: "_id id name image",
     })
-    // 🔁 quem repostou (para mostrar "repostado por @")
     .populate({
       path: "repostedBy",
       model: User,
       select: "_id id name username image",
     })
-    // 🔁 lista de usuários que repostaram o post original
     .populate({
       path: "reposts",
       model: User,
       select: "_id id name username image",
     })
-    // 🔁 post original (se for um repost)
     .populate({
       path: "repostOf",
       populate: [
@@ -48,13 +48,37 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
     })
     .select("_id text author community children parentId createdAt likes reposts repostedBy repostOf");
 
-  const totalPostsCount = await Thread.countDocuments({ parentId: { $in: [null, undefined] } });
+  const totalPostsCount = await Thread.countDocuments({
+    parentId: { $in: [null, undefined] },
+  });
+
   const posts = await postsQuery.exec();
+
+  // 🔁 Converte para objetos simples
   const plainPosts = posts.map((p) => JSON.parse(JSON.stringify(p)));
+
+  // 🔁 Cria "posts virtuais" para cada repost existente
+  const virtualReposts = plainPosts.flatMap((post) => {
+    if (!post.reposts?.length) return [];
+
+    // Para cada usuário que repostou, gera uma cópia virtual
+    return post.reposts.map((user: any) => ({
+      ...post,
+      _id: `${post._id}-repost-${user.id || user._id}`,
+      repostedBy: user,
+      repostOf: post,
+      reposts: post.reposts,
+    }));
+  });
+
+  // Junta posts originais + reposts visuais
+  const allPosts = [...plainPosts, ...virtualReposts].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 
   const isNext = totalPostsCount > skipAmount + posts.length;
 
-  return { posts: plainPosts, isNext };
+  return { posts: allPosts, isNext };
 }
 
 interface Params {
@@ -173,51 +197,70 @@ export async function fetchThreadById(threadId: string): Promise<any | null> {
   await connectToDB();
 
   try {
-    const thread = await Thread.findById(threadId)
-      .select("text author likes children createdAt parentId community reposts repostOf repostedBy")
-      .populate({
-        path: "author",
-        model: User,
-        select: "_id id name username image",
-      })
-      .populate({
-        path: "repostedBy",
-        model: User,
-        select: "_id id name username image",
-      })
-      .populate({
-        path: "reposts",
-        model: User,
-        select: "_id id name username image",
-      })
-      .populate({
-        path: "repostOf",
-        model: Thread,
-        populate: [
-          { path: "author", model: User, select: "_id id name username image" },
-          { path: "community", model: Community, select: "_id id name image" },
-        ],
-      })
-      .populate({
-        path: "community",
-        model: Community,
-        select: "_id id name image",
-      })
+    const baseThread = await Thread.findById(threadId)
+      .populate("author", "_id id name username image")
+      .populate("repostedBy", "_id id name username image")
+      .populate("reposts", "_id id name username image")
+      .populate("community", "_id id name image")
       .populate({
         path: "children",
         model: Thread,
-        select: "text author likes children createdAt parentId reposts repostOf repostedBy",
         populate: [
           { path: "author", model: User, select: "_id id name image" },
           { path: "repostedBy", model: User, select: "_id id name username image" },
-          { path: "reposts", model: User, select: "_id id name username image" },
         ],
       })
-      .lean()
-      .exec();
+      .lean();
 
-    if (!thread) return null;
-    return JSON.parse(JSON.stringify(thread));
+    if (!baseThread) return null;
+
+    // ✅ Caso seja um repost, buscar o post original
+    if (baseThread.repostOf) {
+      const original = await Thread.findById(baseThread.repostOf)
+        .populate("author", "_id id name username image")
+        .populate("community", "_id id name image")
+        .populate("reposts", "_id id name username image")
+        .populate({
+          path: "children",
+          model: Thread,
+          populate: [
+            { path: "author", model: User, select: "_id id name username image" },
+            { path: "repostedBy", model: User, select: "_id id name username image" },
+          ],
+        })
+        .lean();
+
+      if (!original) return null;
+
+      // ✅ Normaliza reposts (garante sempre array de strings)
+      const normalizedReposts = (original.reposts || []).map((r: any) => {
+        if (typeof r === "string") return r;
+        return r?.id || r?._id?.toString?.() || "";
+      });
+
+      return JSON.parse(
+        JSON.stringify({
+          _id: baseThread._id,
+          repostOf: { ...original, reposts: normalizedReposts },
+          repostedBy: baseThread.repostedBy,
+          createdAt: baseThread.createdAt,
+          isRepostView: true,
+        })
+      );
+    }
+
+    // ✅ Normaliza reposts no post original (sem repostOf)
+    const normalizedBaseReposts = (baseThread.reposts || []).map((r: any) => {
+      if (typeof r === "string") return r;
+      return r?.id || r?._id?.toString?.() || "";
+    });
+
+    return JSON.parse(
+      JSON.stringify({
+        ...baseThread,
+        reposts: normalizedBaseReposts,
+      })
+    );
   } catch (err) {
     console.error("Erro ao buscar postagem:", err);
     throw new Error("Não foi possível buscar o post");
@@ -230,35 +273,76 @@ export async function addCommentToThread(
   userId: string,
   path: string
 ) {
-  connectToDB();
+  await connectToDB();
 
   try {
-    // 🔹 Busca o post original
-    const originalThread = await Thread.findById(threadId);
+    // 🧩 Normaliza threadId
+    if (!threadId || typeof threadId !== "string") {
+      console.error("❌ addCommentToThread: threadId inválido:", threadId);
+      throw new Error("ID da thread inválido");
+    }
 
+    const cleanThreadId = threadId.includes("-repost-")
+      ? threadId.split("-repost-")[0]
+      : threadId;
+
+    // 🧩 Busca o usuário corretamente
+    let user;
+    if (userId.startsWith("user_")) {
+      user = await User.findOne({ id: userId });
+    } else if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      console.error("❌ Usuário não encontrado para comentar:", userId);
+      throw new Error("Usuário não encontrado");
+    }
+
+    // 🔹 Busca o post original
+    const originalThread = await Thread.findById(cleanThreadId);
     if (!originalThread) {
+      console.error("❌ Post não encontrado:", cleanThreadId);
       throw new Error("Post não encontrado");
     }
 
-    // 🔹 Cria o comentário
+    // 🔹 Cria o comentário com ObjectId do autor
     const commentThread = new Thread({
       text: commentText,
-      author: userId,
-      parentId: threadId,
+      author: user._id,
+      parentId: cleanThreadId,
     });
 
-    // 🔹 Salva o comentário
-    const savedCommentThread = await commentThread.save();
+    await commentThread.save();
 
-    // 🔹 Vincula ao post principal
-    originalThread.children.push(savedCommentThread._id);
+    // 🔹 Vincula o comentário ao post principal
+    originalThread.children.push(commentThread._id);
     await originalThread.save();
 
-    await originalThread.save();
+    // 🔁 Revalida as páginas relacionadas
+    revalidatePath(`/thread/${cleanThreadId}`, "page");
+    revalidatePath(`/profile/${user.id}`);
 
-    // ✅ Corrige o problema dos likes sumirem
-    revalidatePath(`/thread/${threadId}`, "page"); // força atualização da thread atual
-    revalidatePath(`/profile/${originalThread.author}`); // revalida perfil
+    console.log(`💬 Comentário adicionado por ${user.name} → thread ${cleanThreadId}`);
+
+    // 🟢 Cria Activity (notificação)
+    const postAuthor = await User.findById(originalThread.author);
+    if (postAuthor && String(postAuthor._id) !== String(user._id)) {
+      await Activity.create({
+        user: user._id,              // quem comentou
+        targetUser: postAuthor._id,  // dono do post
+        thread: originalThread._id,  // post comentado
+        type: "reply",               // tipo de atividade
+        isRead: false,               // não lida
+      });
+    }
+
+    // 🔔 Atualiza contador global de notificações no client
+    if (typeof window !== "undefined") {
+      const unread = parseInt(localStorage.getItem("unreadCount") || "0", 10);
+      localStorage.setItem("unreadCount", (unread + 1).toString());
+      window.dispatchEvent(new Event("notifications:update"));
+    }
 
   } catch (err) {
     console.error("Erro ao adicionar comentário:", err);
@@ -273,30 +357,35 @@ export async function toggleLike(threadId: string, userId: string, path: string)
     const thread = await Thread.findById(threadId);
     if (!thread) throw new Error("Post não encontrado");
 
-    // Garante que o campo likes sempre exista
-    if (!Array.isArray(thread.likes)) {
-      thread.likes = [];
-    }
+    if (!Array.isArray(thread.likes)) thread.likes = [];
 
-    // Remove likes vazios residuais (limpa DB temporariamente em memória)
     thread.likes = thread.likes.filter((id: string) => id && id.toString().trim() !== "");
 
-    // sanitize incoming userId: remove aspas extras e normalize to string
-    let sanitizedUserId = String(userId ?? "").trim();
-    // se veio com aspas por conta de JSON.stringify -> remove
-    sanitizedUserId = sanitizedUserId.replace(/^"+|"+$/g, "");
-
-    if (!sanitizedUserId) {
-      console.error("toggleLike: userId inválido recebido:", { original: userId, sanitized: sanitizedUserId });
-      throw new Error("ID do usuário inválido ao curtir");
-    }
+    const sanitizedUserId = String(userId ?? "").trim().replace(/^"+|"+$/g, "");
+    if (!sanitizedUserId) throw new Error("ID do usuário inválido ao curtir");
 
     const hasLiked = thread.likes.map(String).includes(sanitizedUserId);
 
     if (hasLiked) {
+      // ➖ Remove curtida
       thread.likes = thread.likes.filter((id: string) => String(id) !== sanitizedUserId);
     } else {
+      // ➕ Adiciona curtida
       thread.likes.push(sanitizedUserId);
+
+      // 🔹 Cria Activity (notificação de curtida)
+      const liker = await User.findOne({ id: sanitizedUserId });
+      const postAuthor = await User.findById(thread.author);
+
+      if (liker && postAuthor && String(liker._id) !== String(postAuthor._id)) {
+        await Activity.create({
+          user: liker._id,
+          targetUser: postAuthor._id,
+          thread: thread._id,
+          type: "like",
+          isRead: false, // nova notificação não lida
+        });
+      }
     }
 
     await thread.save();
@@ -309,7 +398,6 @@ export async function toggleLike(threadId: string, userId: string, path: string)
   }
 }
 
-// 🔹 Buscar posts e comentários curtidos por um usuário específico (compatível com Clerk ID e ObjectId)
 export async function fetchLikedPosts(userId: string) {
   try {
     await connectToDB();
@@ -414,6 +502,25 @@ export async function fetchUserReplies(userId: string) {
             model: Thread,
             select: "_id",
           },
+          // populate reposts and repostOf on parent
+          {
+            path: "reposts",
+            model: User,
+            select: "_id id name username image",
+          },
+          {
+            path: "repostOf",
+            model: Thread,
+            populate: [
+              { path: "author", model: User, select: "_id id name username image" },
+              { path: "community", model: Community, select: "_id id name image" },
+            ],
+          },
+          {
+            path: "repostedBy",
+            model: User,
+            select: "_id id name username image",
+          },
         ],
       })
       .sort({ createdAt: -1 }) // mais recente primeiro
@@ -430,7 +537,31 @@ export async function fetchUserReplies(userId: string) {
       );
     });
 
-    return JSON.parse(JSON.stringify(filteredReplies));
+    // Normaliza reposts (tanto do reply quanto do parent) antes de retornar
+    const normalized = filteredReplies.map((reply: any) => {
+      const normReplyReposts = (reply.reposts || []).map((r: any) =>
+        typeof r === "string" ? r : r?.id || r?._id?.toString?.() || ""
+      );
+
+      const normParent = reply.parentId
+        ? {
+          ...reply.parentId,
+          reposts: (reply.parentId.reposts || []).map((r: any) =>
+            typeof r === "string" ? r : r?.id || r?._id?.toString?.() || ""
+          ),
+          repostOf: reply.parentId.repostOf || null,
+          repostedBy: reply.parentId.repostedBy || null,
+        }
+        : null;
+
+      return {
+        ...reply,
+        reposts: normReplyReposts,
+        parentId: normParent,
+      };
+    });
+
+    return JSON.parse(JSON.stringify(normalized));
   } catch (error) {
     console.error("Erro ao buscar respostas do usuário:", error);
     throw new Error("Falha ao buscar respostas do usuário");
@@ -462,70 +593,43 @@ export async function repostThread(userId: string, threadId: string, path: strin
   try {
     await connectToDB();
 
-    // 🔹 Busca o usuário MongoDB a partir do Clerk ID
     const user = await User.findOne({ id: userId });
     if (!user) throw new Error("Usuário não encontrado no banco de dados.");
 
-    const thread = await Thread.findById(threadId)
-      .populate("author")
-      .populate("community");
-
+    const thread = await Thread.findById(threadId);
     if (!thread) throw new Error("Post original não encontrado.");
 
-    const userObjectId = user._id.toString();
+    if (!Array.isArray(thread.reposts)) thread.reposts = [];
 
-    // 🔹 Verifica se o usuário já repostou esse post
-    const existingRepost = await Thread.findOne({
-      author: user._id,
-      repostOf: thread._id,
-    });
+    const normalizedUserId = String(user.id || userId).trim();
+    const hasReposted = thread.reposts.map(String).includes(normalizedUserId);
 
-    if (existingRepost) {
+    if (hasReposted) {
       console.log("🟡 Desfazendo repost...");
-
-      // 🔹 Remove repost
-      await Thread.findByIdAndDelete(existingRepost._id);
-
-      // 🔹 Remove usuário do array de reposts do post original
-      thread.reposts = thread.reposts.filter(
-        (r: any) => r.toString() !== userObjectId
-      );
+      thread.reposts = thread.reposts.filter((r: any) => String(r) !== normalizedUserId);
       await thread.save();
-
-      console.log(`✅ Repost removido: ${user.id} → ${thread._id}`);
-
-      revalidatePath(path); // 🔁 atualiza a página automaticamente
+      revalidatePath(path);
       return { action: "unrepost", success: true };
-    }
-
-    // 🔹 Evita duplicatas antes de criar novo repost
-    const alreadyInArray = thread.reposts.some(
-      (r: any) => r.toString() === userObjectId
-    );
-
-    if (!alreadyInArray) {
-      thread.reposts.push(user._id);
+    } else {
+      console.log("🟢 Criando repost...");
+      thread.reposts.push(normalizedUserId);
       await thread.save();
+
+      // 🔹 Cria Activity no Mongo
+      const postAuthor = await User.findById(thread.author);
+      if (postAuthor && String(postAuthor._id) !== String(user._id)) {
+        await Activity.create({
+          user: user._id,          // quem repostou
+          targetUser: postAuthor._id, // dono do post original
+          thread: thread._id,
+          type: "repost",
+          isRead: false, // marca como não lida
+        });
+      }
+
+      revalidatePath(path);
+      return { action: "repost", success: true };
     }
-
-    // 🔹 Cria novo repost
-    const repostThread = await Thread.create({
-      text: thread.text,
-      author: user._id,
-      community: thread.community || null,
-      repostOf: thread._id,
-      repostedBy: user._id,
-    });
-
-    // 🔹 Vincula repost ao usuário
-    await User.findByIdAndUpdate(user._id, {
-      $push: { threads: repostThread._id },
-    });
-
-    console.log(`✅ Repost criado: ${user.id} → ${thread._id}`);
-
-    revalidatePath(path); // 🔁 atualiza automaticamente após repostar
-    return { action: "repost", success: true };
   } catch (err) {
     console.error("Erro ao repostar:", err);
     throw new Error("Falha ao repostar publicação");
@@ -536,34 +640,38 @@ export async function toggleRepost(userId: string, threadId: string, path: strin
   try {
     await connectToDB();
 
-    // ✅ Detecta se é ID do Clerk (user_...) ou ObjectId
-    const query = userId.startsWith("user_")
-      ? { id: userId }
-      : { _id: userId };
-
-    const user = await User.findOne(query);
+    // 🔹 Busca o usuário pelo Clerk ID (mantém compatibilidade)
+    const user = await User.findOne({ id: userId });
     if (!user) throw new Error("Usuário não encontrado");
 
     const thread = await Thread.findById(threadId).populate("author");
     if (!thread) throw new Error("Post não encontrado");
 
-    // ✅ Verifica se já repostou
-    const alreadyReposted = thread.reposts?.some(
-      (id) => id.toString() === user._id.toString()
-    );
+    // 🔹 Garante que o campo reposts é um array
+    if (!Array.isArray(thread.reposts)) {
+      thread.reposts = [];
+    }
+
+    // 🔹 Normaliza sempre para Clerk ID
+    const normalizedUserId = String(user.id || userId).trim();
+
+    // 🔹 Verifica se já repostou
+    const alreadyReposted = thread.reposts
+      .map(String)
+      .includes(normalizedUserId);
 
     if (alreadyReposted) {
       // ➖ Remover repost
       thread.reposts = thread.reposts.filter(
-        (id) => id.toString() !== user._id.toString()
+        (r: any) => String(r) !== normalizedUserId
       );
       thread.repostedBy = undefined as any;
       await thread.save();
       console.log(`Repost removido por ${user.name}`);
     } else {
       // ➕ Adicionar repost
-      thread.reposts.push(user._id);
-      thread.repostedBy = user._id;
+      thread.reposts.push(normalizedUserId);
+      thread.repostedBy = user.id;
       await thread.save();
       console.log(`Post repostado por ${user.name}`);
     }

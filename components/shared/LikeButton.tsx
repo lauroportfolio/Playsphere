@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface LikeButtonProps {
   threadId: string;
@@ -12,16 +13,34 @@ interface LikeButtonProps {
   likeCount: number;
 }
 
-export default function LikeButton({ threadId, currentUserId, isLiked, likeCount }: LikeButtonProps) {
+export default function LikeButton({
+  threadId,
+  currentUserId,
+  isLiked,
+  likeCount,
+}: LikeButtonProps) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   async function handleLike() {
+    if (!currentUserId) {
+      toast.error("Você precisa estar logado para curtir ❌");
+      return;
+    }
+
     startTransition(async () => {
-      const { toggleLike } = await import("@/lib/actions/thread.actions");
-      const path = typeof window !== "undefined" ? window.location.pathname : "/";
-      await toggleLike(threadId, currentUserId, path);
-      router.refresh();
+      try {
+        const { toggleLike } = await import("@/lib/actions/thread.actions");
+        const path = typeof window !== "undefined" ? window.location.pathname : "/";
+        const res = await toggleLike(threadId, currentUserId, path);
+
+        // 🔁 Atualiza página e contador global de notificações
+        router.refresh();
+        window.dispatchEvent(new Event("notifications:update"));
+      } catch (err) {
+        console.error("Erro ao curtir:", err);
+        toast.error("Falha ao curtir publicação ❌");
+      }
     });
   }
 
@@ -30,29 +49,17 @@ export default function LikeButton({ threadId, currentUserId, isLiked, likeCount
       type="button"
       onClick={handleLike}
       disabled={isPending}
-      whileTap={{ scale: 0.75 }}
-      animate={{
-        scale: isLiked ? [1, 1.3, 1] : [1, 0.8, 1],
-        transition: { duration: 0.25 },
-      }}
+      whileTap={{ scale: 0.85 }}
+      whileHover={{ scale: 1.1 }}
       className="flex items-center gap-1 cursor-pointer disabled:opacity-50"
     >
-      <motion.div
-        key={isLiked ? "filled" : "empty"}
-        initial={{ opacity: 0, rotate: -20 }}
-        animate={{ opacity: 1, rotate: 0 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-      >
-        <Image
-          src={isLiked ? "/assets/heart-filled.svg" : "/assets/heart-gray.svg"}
-          alt="like"
-          width={24}
-          height={24}
-          className="object-contain select-none"
-        />
-      </motion.div>
-
+      <Image
+        src={isLiked ? "/assets/heart-filled.svg" : "/assets/heart-gray.svg"}
+        alt="like"
+        width={24}
+        height={24}
+        className="object-contain select-none"
+      />
       <span className="text-gray-1 text-sm">{likeCount}</span>
     </motion.button>
   );

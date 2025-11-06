@@ -1,5 +1,5 @@
-import ThreadRefreshListener from "@/components/shared/ThreadRefreshListener";
 import ThreadCard from "@/components/cards/ThreadCard";
+import GlobalRefreshListener from "@/components/shared/GlobalRefreshListener";
 import { fetchPosts } from "@/lib/actions/thread.actions";
 import { currentUser } from "@clerk/nextjs/server";
 
@@ -10,7 +10,7 @@ export default async function Home() {
   return (
     <>
       {/* 🔁 Atualiza automaticamente quando deletar repost */}
-      <ThreadRefreshListener />
+      <GlobalRefreshListener />
 
       <h1 className="home-container">Home</h1>
 

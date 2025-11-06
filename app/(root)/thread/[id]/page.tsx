@@ -9,15 +9,14 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const Page = async ({ params }: { params: { id: string } }) => {
-    // if (!params.id) return null;
-    const { id } = await Promise.resolve(params); // alterado
+    const { id } = await Promise.resolve(params);
     if (!id) return null;
 
     const user = await currentUser();
     if (!user) return null;
 
     const userInfo = await fetchUser(user.id);
-    if (!userInfo?.onboarded) redirect('/onboarding')
+    if (!userInfo?.onboarded) redirect("/onboarding");
 
     const thread = await fetchThreadById(id);
     if (!thread) return redirect("/");
@@ -28,22 +27,25 @@ const Page = async ({ params }: { params: { id: string } }) => {
                 <ThreadCard
                     key={thread._id}
                     id={thread._id}
-                    currentUserId={user?.id || ""}
+                    currentUserId={user?.id}
                     parentId={thread.parentId}
                     content={thread.text}
                     author={thread.author}
                     community={thread.community}
                     createdAt={thread.createdAt}
                     comments={thread.children}
-                    likes={thread.likes} // ✅ adicione isto!
+                    likes={thread.likes}
+                    reposts={thread.reposts || []}
+                    repostOf={thread.repostOf || null}
+                    repostedBy={thread.repostedBy || null}
                 />
             </div>
 
             <div className="mt-7">
                 <Comment
-                    threadId={thread.id}
+                    threadId={thread._id}
                     currentUserImg={userInfo.image}
-                    currentUserId={user.id}   // <- Clerk ID, string como "user_..."
+                    currentUserId={user.id}
                 />
             </div>
 
@@ -52,7 +54,7 @@ const Page = async ({ params }: { params: { id: string } }) => {
                     <ThreadCard
                         key={childItem._id}
                         id={childItem._id}
-                        currentUserId={user.id} // ✅ sempre o usuário logado (Clerk)
+                        currentUserId={user.id}
                         parentId={childItem.parentId}
                         content={childItem.text}
                         author={childItem.author}
@@ -60,12 +62,15 @@ const Page = async ({ params }: { params: { id: string } }) => {
                         createdAt={childItem.createdAt}
                         comments={childItem.children}
                         isComment
-                        likes={childItem.likes || []} // ✅ garante contagem de likes dos comentários
+                        likes={childItem.likes || []}
+                        reposts={childItem.reposts || []}
+                        repostOf={childItem.repostOf || null}
+                        repostedBy={childItem.repostedBy || null}
                     />
                 ))}
             </div>
         </section>
-    )
-}
+    );
+};
 
 export default Page;
