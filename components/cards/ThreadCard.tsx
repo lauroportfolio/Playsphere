@@ -17,6 +17,7 @@ import ShareButton from "../shared/ShareButton";
 import RepostButton from "../shared/RepostButton";
 import DeleteButton from "../shared/DeleteButton";
 import RepostController from "../shared/RepostController";
+import LikeButton from "../shared/LikeButton";
 
 interface UserLite {
   id?: string;
@@ -87,7 +88,7 @@ const ThreadCard = ({
 
   // 🧩 Corrige a detecção de repost preenchido mesmo em páginas de repost
   const isRepostedByMe = Array.isArray(effectiveReposts)
-  ? effectiveReposts.some((r: any) => {
+    ? effectiveReposts.some((r: any) => {
       const repostId =
         typeof r === "string"
           ? r
@@ -96,7 +97,7 @@ const ThreadCard = ({
       const cleanB = currentUserId?.toString()?.replace("user_", "").toLowerCase();
       return cleanA === cleanB;
     })
-  : false;
+    : false;
 
   const isAuthorOfThisThread = currentUserId === author?.id;
 
@@ -109,7 +110,7 @@ const ThreadCard = ({
       {isRepostThread && repostedBy && (
         <div className="mb-3 flex items-center gap-2 text-sm text-gray-400">
           <Image
-            src={repostedBy.image || "/assets/default-profile.png"}
+            src={repostedBy.image || "/assets/user.svg"}
             alt={repostedBy.name || "Reposter"}
             width={18}
             height={18}
@@ -175,41 +176,12 @@ const ThreadCard = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   {/* ❤️ LIKE */}
-                  {currentUserId && (
-                    <form
-                      action={async () => {
-                        "use server";
-                        const { toggleLike } = await import(
-                          "@/lib/actions/thread.actions"
-                        );
-                        const path =
-                          typeof window !== "undefined"
-                            ? window.location.pathname
-                            : "/";
-                        await toggleLike(targetThreadId, currentUserId, path);
-                      }}
-                    >
-                      <button
-                        type="submit"
-                        className="flex items-center gap-1 align-middle"
-                      >
-                        <Image
-                          src={
-                            hasLiked
-                              ? "/assets/heart-filled.svg"
-                              : "/assets/heart-gray.svg"
-                          }
-                          alt="like"
-                          width={24}
-                          height={24}
-                          className="cursor-pointer object-contain"
-                        />
-                        <span className="text-gray-1 text-sm">
-                          {displayPost?.likes?.length ?? 0}
-                        </span>
-                      </button>
-                    </form>
-                  )}
+                  <LikeButton
+                    threadId={targetThreadId}
+                    currentUserId={currentUserId}
+                    isLiked={hasLiked}
+                    likeCount={displayPost?.likes?.length ?? 0}
+                  />
 
                   {/* 💬 COMENTÁRIOS */}
                   <Link href={`/thread/${targetThreadId}`}>
@@ -268,7 +240,7 @@ const ThreadCard = ({
                         </AlertDialogCancel>
                         <DeleteButton
                           threadId={targetThreadId}
-                          className="cursor-pointer bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+                          className="cursor-pointer text-white px-4 py-2 rounded-md"
                         />
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -290,23 +262,29 @@ const ThreadCard = ({
       </div>
 
       {/* 📍 Comunidade */}
-      {!isComment && displayPost.community && (
+      {!isComment && displayPost?.community && (
         <Link
           href={`/communities/${displayPost.community.id}`}
-          className="mt-5 flex items-center"
+          className="mt-5 flex items-center gap-2"
         >
           <p className="subtle-medium text-gray-1">
-            {formatDateString(displayPost.createdAt || createdAt)} - Comunidade{" "}
+            {formatDateString(displayPost.createdAt || createdAt)} — Comunidade{" "}
             {displayPost.community.name}
           </p>
 
-          <Image
-            src={displayPost.community.image}
-            alt={displayPost.community.name}
-            width={14}
-            height={14}
-            className="ml-1 rounded-full object-cover"
-          />
+          <div className="relative ml-1 w-5 h-5 rounded-full overflow-hidden">
+            <Image
+              src={
+                displayPost.community.image &&
+                  displayPost.community.image.trim() !== ""
+                  ? displayPost.community.image
+                  : "/assets/community.svg"
+              }
+              alt={displayPost.community.name || "Comunidade"}
+              fill
+              className="object-cover"
+            />
+          </div>
         </Link>
       )}
     </article>

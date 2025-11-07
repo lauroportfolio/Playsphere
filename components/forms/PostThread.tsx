@@ -20,6 +20,7 @@ import { useOrganization } from "@clerk/nextjs";
 // import { updateUser } from "@/lib/actions/user.actions";
 import { ThreadValidation } from "@/lib/validations/thread";
 import { createThread } from "@/lib/actions/thread.actions";
+import { LoadingButton } from "../shared/LoadingButton";
 
 interface Props {
     user: {
@@ -49,7 +50,7 @@ function PostThread({ userId }: { userId: string }) {
     const onSubmit = async (values: z.infer<typeof ThreadValidation>) => {
         await createThread({
             text: values.thread,
-            author: userId ,
+            author: userId,
             communityId: organization ? organization.id : null,
             path: pathname,
         });
@@ -69,7 +70,7 @@ function PostThread({ userId }: { userId: string }) {
                     render={({ field }) => (
                         <FormItem className='flex w-full flex-col gap-3'>
                             <FormLabel className='base-semibold text-light-2'>
-                                Content
+                                Conteúdo
                             </FormLabel>
                             <FormControl className="not-focus border bg-border-dark-3 text-light-1">
                                 <Textarea
@@ -82,7 +83,21 @@ function PostThread({ userId }: { userId: string }) {
                     )}
                 />
 
-                <Button type="submit" className="cursor-pointer bg-primary-500">Publicar</Button>
+                <LoadingButton
+                    onClick={async () => {
+                        await createThread({
+                            text: form.getValues().thread,
+                            author: userId,
+                            communityId: organization ? organization.id : null,
+                            path: pathname,
+                        });
+                        router.push("/");
+                    }}
+                    className="cursor-pointer bg-[#877EFF] hover:bg-[#6c62d9] text-white px-4 py-2 rounded-md"
+                >
+                    Publicar
+                </LoadingButton>
+
             </form>
         </Form>
     )

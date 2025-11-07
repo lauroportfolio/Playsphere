@@ -366,9 +366,13 @@ main {
   height: auto;
   min-width: 74px;
   border-radius: 0.5rem;
-  background-color: #877EFF; 
+  background-color: #877EFF;
   font-size: 12px;
   color: #FFFFFF !important;
+}
+
+.user-card_btn:hover {
+  background-color: #6c62d9;
 }
 
 /* Activity */
@@ -444,6 +448,10 @@ main {
   line-height: 140%;  /* text-small-regular */
   font-weight: 400;   /* text-small-regular */
   color: #FFFFFF; /* !text-light-1 */
+}
+
+.community-card_btn:hover {
+  background-color: #6c62d9;
 }
 
 
@@ -599,6 +607,10 @@ main {
   border-radius: 0.5rem;
   padding: 0.75rem;
   box-sizing: border-box;
+}
+
+.text-primary {
+  color: #877EFF;
 }
 
 .leftsidebar>.flex-column {
@@ -769,11 +781,11 @@ main {
   /* border-l border-l-dark-4 */
   background-color: #121417;
   /* bg-dark-2 */
-  padding-left: 2.5rem;
+  padding-left: 2rem;
   /* px-10 (40px) */
-  padding-right: 2.5rem;
+  padding-right: 2rem;
   /* px-10 (40px) */
-  padding-bottom: 1.5rem;
+  padding-bottom: 3rem;
   /* pb-6 (24px) */
   padding-top: 7rem;
   /* pt-28 (112px) */
@@ -802,6 +814,39 @@ main {
   font-size: 20px;
   line-height: 140%;
   font-weight: 500;
+}
+
+.searchbar {
+  display: flex;
+  gap: 0.25rem;              /* equivalente a gap-1 */
+  border-radius: 0.5rem;     /* rounded-lg */
+  background-color: #101012; /* bg-dark-3 (ajuste se a tua cor for diferente) */
+  padding: 0.5rem 1rem;      /* py-2 px-4 */
+  align-items: center;
+}
+
+.searchbar_input {
+  border: none;
+  background-color: #101012; /* bg-dark-3 */
+  color: #5C5C7B;            /* text-light-4 */
+  font-size: 1rem;           /* text-base */
+  font-weight: 400;          /* text-base-regular */
+  outline: none !important;
+  flex: 1;
+}
+
+.searchbar_input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.pagination {
+  margin-top: 2.5rem;        /* mt-10 */
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;              /* gap-5 */
 }
 
 .onboarding-container {
@@ -1094,6 +1139,13 @@ main {
   scrollbar-color: #877EFF #0e0e10;
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
 
 /* ---break---*/
 

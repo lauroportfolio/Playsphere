@@ -15,7 +15,7 @@ import {
     AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import SaveProfileButton from "@/components/shared/SaveProfileButton"; // ✅ novo componente para toast
+import SaveProfileButton from "@/components/shared/SaveProfileButton";
 
 // ✅ Corrige tipagem do Next.js 15 (params é Promise)
 type PageProps = {

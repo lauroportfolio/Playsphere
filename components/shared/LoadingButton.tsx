@@ -1,25 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { motion } from "framer-motion";
 import Image from "next/image";
 
-interface Props {
-  onConfirm: () => Promise<void>;
+interface LoadingButtonProps {
+  onClick: () => Promise<void>;
+  children: React.ReactNode;
+  className?: string;
 }
 
-console.log("Mounted SaveProfileButton");
-export default function SaveProfileButton({ onConfirm }: Props) {
+export function LoadingButton({ onClick, children, className = "" }: LoadingButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleClick = async () => {
+  const handle = async () => {
     if (isLoading) return;
-    console.log("SaveProfileButton clicked — setting isLoading=true");
     setIsLoading(true);
 
-    toast("Salvando alterações...", {
-      description: "Aguarde enquanto seu perfil é atualizado.",
+    toast("Publicando...", {
+      description: "Aguarde enquanto sua postagem é criada.",
       style: {
         background: "#1e1e2a",
         color: "#fff",
@@ -32,8 +33,8 @@ export default function SaveProfileButton({ onConfirm }: Props) {
     });
 
     try {
-      await onConfirm();
-      toast.success("Perfil atualizado! ✅", {
+      await onClick();
+      toast.success("Post publicado! ✅", {
         style: {
           background: "#1e1e2a",
           color: "#fff",
@@ -44,12 +45,13 @@ export default function SaveProfileButton({ onConfirm }: Props) {
           boxShadow: "0 4px 12px rgba(135,126,255,0.3)",
         },
         icon: (
-          <Image src="/assets/heart-filled.svg" alt="Sucesso" width={22} height={22} className="invert" />
+          <motion.div initial={{ scale:0.8, opacity:0 }} animate={{ scale:1, opacity:1 }} transition={{ type:"spring", stiffness:250, damping:10 }}>
+            <Image src="/assets/heart-filled.svg" alt="Sucesso" width={22} height={22} className="invert" />
+          </motion.div>
         ),
       });
-    } catch (err) {
-      console.error(err);
-      toast.error("Falha ao salvar alterações ❌", {
+    } catch (error) {
+      toast.error("Falha ao publicar ❌", {
         style: {
           background: "#1e1e2a",
           color: "#fff",
@@ -67,20 +69,23 @@ export default function SaveProfileButton({ onConfirm }: Props) {
 
   return (
     <Button
-      type="button"
-      onClick={handleClick}
+      onClick={handle}
       disabled={isLoading}
-      className={`w-full ${
-        isLoading ? "cursor-not-allowed opacity-50 flex items-center justify-center gap-2" : ""
-      } bg-[#877EFF] text-white hover:bg-[#6c62d9]`}
+      className={`${className} ${isLoading ? "cursor-not-allowed opacity-50 flex items-center justify-center gap-2" : ""}`}
     >
       {isLoading ? (
         <>
-          <Image src="/assets/loading.svg" alt="Carregando" width={20} height={20} className="animate-spin" />
-          <span>Salvando...</span>
+          <Image
+            src="/assets/loading.svg"
+            alt="Carregando"
+            width={20}
+            height={20}
+            className="animate-spin"
+          />
+          <span>Publicando...</span>
         </>
       ) : (
-        "Salvar Alterações"
+        children
       )}
     </Button>
   );

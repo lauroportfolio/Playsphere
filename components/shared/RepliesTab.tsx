@@ -9,18 +9,6 @@ interface Props {
 const RepliesTab = async ({ userId, currentUserId }: Props) => {
   const replies = await fetchUserReplies(userId);
 
-  // Log servidor para debug — verifique no terminal do Next.js
-  console.log("RepliesTab debug — currentUserId:", currentUserId);
-  console.log(
-    "RepliesTab debug — replies parent reposts sample:",
-    replies.slice(0, 5).map((r: any) => ({
-      replyId: r._id,
-      parentId: r.parentId?._id,
-      parentReposts: r.parentId?.reposts || [],
-      replyReposts: r.reposts || [],
-    }))
-  );
-
   if (!replies || replies.length === 0) {
     return <p className="text-gray-1 mt-4">Nenhuma resposta ainda.</p>;
   }

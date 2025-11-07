@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { usePathname, useRouter } from "next/navigation";
 import { ChangeEvent, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { motion } from "framer-motion";
 
 import {
   Form,
@@ -46,6 +47,7 @@ type UploadThingResult = {
 };
 
 const AccountProfile = ({ user, btnTitle }: Props) => {
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { startUpload } = useUploadThing("media");
@@ -63,6 +65,22 @@ const AccountProfile = ({ user, btnTitle }: Props) => {
   });
 
   const onSubmit = async (values: z.infer<typeof UserValidation>) => {
+    if (isLoading) return;
+    setIsLoading(true);
+
+    toast("Salvando alterações...", {
+      description: "Aguarde enquanto seu perfil é atualizado.",
+      style: {
+        background: "#1e1e2a",
+        color: "#fff",
+        border: "1px solid #877EFF",
+        borderRadius: "10px",
+        padding: "14px 18px",
+        fontSize: "15px",
+        boxShadow: "0 4px 12px rgba(135,126,255,0.3)",
+      },
+    });
+
     try {
       const blob = values.profile_photo;
       const hasImageChanged = isBase64Image(blob);
@@ -103,7 +121,22 @@ const AccountProfile = ({ user, btnTitle }: Props) => {
         path: pathname,
       });
 
-      toast.success("Perfil atualizado com sucesso! 🚀");
+      toast.success("Perfil atualizado! ✅", {
+        style: {
+          background: "#1e1e2a",
+          color: "#fff",
+          border: "1px solid #877EFF",
+          borderRadius: "10px",
+          padding: "14px 18px",
+          fontSize: "15px",
+          boxShadow: "0 4px 12px rgba(135,126,255,0.3)",
+        },
+        icon: (
+          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 250, damping: 10 }}>
+            <Image src="/assets/heart-filled.svg" alt="Sucesso" width={22} height={22} className="invert" />
+          </motion.div>
+        ),
+      });
 
       // 🔹 Redireciona
       if (pathname === "/profile/edit") {
@@ -113,7 +146,19 @@ const AccountProfile = ({ user, btnTitle }: Props) => {
       }
     } catch (error) {
       console.error("❌ Erro ao atualizar perfil:", error);
-      toast.error("Falha ao atualizar perfil. Tente novamente.");
+      toast.error("Falha ao atualizar perfil. Tente novamente.", {
+        style: {
+          background: "#1e1e2a",
+          color: "#fff",
+          border: "1px solid #ff5f5f",
+          borderRadius: "10px",
+          padding: "14px 18px",
+          fontSize: "15px",
+          boxShadow: "0 4px 12px rgba(255,95,95,0.3)",
+        },
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -245,8 +290,19 @@ const AccountProfile = ({ user, btnTitle }: Props) => {
           )}
         />
 
-        <Button type='submit' className='bg-primary-500 cursor-pointer'>
-          {btnTitle}
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className={`${isLoading ? "cursor-not-allowed opacity-50 flex items-center justify-center gap-2" : ""} cursor-pointer bg-[#877EFF] text-white hover:bg-[#6c62d9] px-4 py-2 rounded-md`}
+        >
+          {isLoading ? (
+            <>
+              <Image src="/assets/loading.svg" alt="Carregando" width={20} height={20} className="animate-spin" />
+              <span>Salvando...</span>
+            </>
+          ) : (
+            btnTitle
+          )}
         </Button>
       </form>
     </Form>

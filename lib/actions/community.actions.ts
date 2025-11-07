@@ -1,6 +1,6 @@
 "use server";
 
-import { FilterQuery, SortOrder } from "mongoose";
+import mongoose, { FilterQuery, SortOrder } from "mongoose";
 
 import Community from "../models/community.model";
 import Thread from "../models/thread.model";
@@ -31,7 +31,7 @@ export async function createCommunity(
       name,
       username,
       image,
-      bio,
+      bio: bio?.trim() || "Comunidade sem descrição",
       createdBy: user._id, // Use the mongoose ID of the user
     });
 
@@ -51,20 +51,38 @@ export async function createCommunity(
 
 export async function fetchCommunityDetails(id: string) {
   try {
-    connectToDB();
+    await connectToDB();
 
-    const communityDetails = await Community.findOne({ id }).populate([
-      "createdBy",
+    const query: any = mongoose.Types.ObjectId.isValid(id)
+      ? { $or: [{ id }, { _id: id }] }
+      : { id };
+
+    const communityDetails = await Community.findOne(query).populate([
+      {
+        path: "createdBy",
+        model: User,
+        select: "name username image id",
+      },
       {
         path: "members",
         model: User,
-        select: "name username image _id id",
+        select: "name username image id",
       },
     ]);
 
-    return communityDetails;
+    if (!communityDetails) return null;
+
+    // 🧩 Normaliza imagem (sem borda branca)
+    const normalizedImage =
+      communityDetails.image && communityDetails.image.trim() !== ""
+        ? communityDetails.image
+        : "/assets/community.svg";
+
+    return {
+      ...communityDetails.toObject(),
+      image: normalizedImage,
+    };
   } catch (error) {
-    // Handle any errors
     console.error("Erro ao buscar detalhes da comunidade:", error);
     throw error;
   }
@@ -152,7 +170,15 @@ export async function fetchCommunities({
     // Check if there are more communities beyond the current page.
     const isNext = totalCommunitiesCount > skipAmount + communities.length;
 
-    return { communities, isNext };
+    const normalized = communities.map((c) => ({
+      ...c.toObject(),
+      image:
+        c.image && c.image.trim() !== ""
+          ? c.image
+          : "/assets/community.svg",
+    }));
+
+    return { communities: normalized, isNext };
   } catch (error) {
     console.error("Erro ao buscar comunidades:", error);
     throw error;
@@ -246,15 +272,16 @@ export async function updateCommunityInfo(
   communityId: string,
   name: string,
   username: string,
-  image: string
+  image: string,
+  bio: string
 ) {
   try {
     connectToDB();
 
-    // Find the community by its _id and update the information
     const updatedCommunity = await Community.findOneAndUpdate(
       { id: communityId },
-      { name, username, image }
+      { name, username, image, bio },
+      { new: true }
     );
 
     if (!updatedCommunity) {
@@ -263,7 +290,6 @@ export async function updateCommunityInfo(
 
     return updatedCommunity;
   } catch (error) {
-    // Handle any errors
     console.error("Erro ao atualizar informações da comunidade:", error);
     throw error;
   }

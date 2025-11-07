@@ -31,25 +31,30 @@ export default function DeleteButton({ threadId, onDeleted, className = "" }: Pr
           style: {
             background: "#1e1e2a",
             color: "#fff",
-            border: "1px solid #FF4D4F",
+            border: "1px solid #877EFF",
             borderRadius: "10px",
             padding: "14px 18px",
             fontSize: "15px",
-            boxShadow: "0 4px 12px rgba(255,77,79,0.3)",
+            boxShadow: "0 4px 12px rgba(135,126,255,0.3)",
           },
         });
 
-        // 🔁 Emite evento global para atualizar Home
         window.dispatchEvent(new Event("thread:refresh"));
-
-        // 🔁 Atualiza rota atual
         router.refresh();
-
-        // callback opcional (caso precise)
         onDeleted?.();
       } catch (err) {
         console.error("Erro ao deletar:", err);
-        toast.error("Falha ao excluir postagem.");
+        toast.error("Falha ao excluir postagem ❌", {
+          style: {
+            background: "#1e1e2a",
+            color: "#fff",
+            border: "1px solid #ff5f5f",
+            borderRadius: "10px",
+            padding: "14px 18px",
+            fontSize: "15px",
+            boxShadow: "0 4px 12px rgba(255,95,95,0.3)",
+          },
+        });
       }
     });
   };
@@ -59,10 +64,11 @@ export default function DeleteButton({ threadId, onDeleted, className = "" }: Pr
       type="button"
       onClick={handleDelete}
       disabled={isPending}
-      className={`cursor-pointer hover:opacity-90 transition ${className}`}
+      className={`flex items-center gap-2 bg-dark-3 hover:bg-dark-4 text-light-1 px-3 py-2 rounded-md transition ${className} ${isPending ? "opacity-50 cursor-not-allowed" : ""}`}
       title="Excluir postagem"
     >
-      <Image src="/assets/delete.svg" alt="delete" width={22} height={22} />
+      <Image src="/assets/delete.svg" alt="Excluir ícone" width={20} height={20} />
+      <span>Excluir postagem</span>
     </button>
   );
 }

@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "../ui/button";
 
 interface Props {
-    id: string;
-    name: string;
-    username: string;
-    imgUrl: string;
-    personType: string;
+  id: string;
+  name: string;
+  username: string;
+  imgUrl?: string; // 👈 agora é opcional
+  personType: string;
 }
 
 const UserCard = ({
@@ -26,7 +26,7 @@ const UserCard = ({
             <div className="user-card_avatar">
                 <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full">
                     <Image
-                        src={imgUrl}
+                        src={imgUrl || "/assets/user.svg"}
                         alt="logo"
                         fill
                         style={{ flexShrink: 0 }}
@@ -41,7 +41,7 @@ const UserCard = ({
             </div>
 
             <Button className="user-card_btn cursor-pointer" onClick={() => router.push(`/profile/${id}`)}>
-                View
+                Ver
             </Button>
         </article>
     )

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useTransition, useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 interface Props {
   threadId: string;
@@ -23,10 +24,22 @@ export default function RepostButton({
   const [isPending, startTransition] = useTransition();
   const [reposted, setReposted] = useState(isReposted);
   const [count, setCount] = useState(initialCount);
+  const router = useRouter();
 
   const handleRepost = async () => {
     if (!currentUserId) {
-      toast.error("Você precisa estar logado para repostar ❌");
+      toast.error("Você precisa estar logado para repostar 🔁", {
+        style: {
+          background: "#1e1e2a",
+          color: "#fff",
+          border: "1px solid #877EFF",
+          borderRadius: "10px",
+          padding: "14px 18px",
+          fontSize: "15px",
+          boxShadow: "0 4px 12px rgba(135,126,255,0.3)",
+        },
+      });
+      router.push("/sign-in");
       return;
     }
 
@@ -44,28 +57,61 @@ export default function RepostButton({
         if (data.action === "repost") {
           setReposted(true);
           setCount((c) => c + 1);
-          toast.success("Post repostado com sucesso 🔁");
+          toast.success("Post repostado com sucesso 🔁", {
+            style: {
+              background: "#1e1e2a",
+              color: "#fff",
+              border: "1px solid #877EFF",
+              borderRadius: "10px",
+              padding: "14px 18px",
+              fontSize: "15px",
+              boxShadow: "0 4px 12px rgba(135,126,255,0.3)",
+            },
+            icon: (
+              <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type:"spring", stiffness:250, damping:10 }}>
+                <Image src="/assets/repost-filled.svg" alt="Repostado" width={22} height={22} className="invert" />
+              </motion.div>
+            ),
+          });
 
-          // 🔁 Atualiza UI local e global
+          window.dispatchEvent(new CustomEvent("repost:updated"));
+          window.dispatchEvent(new CustomEvent("thread:refresh"));
+
           onRepostChange?.(true, count + 1);
-
-          // 🔔 Atualiza contador de notificações (LeftSidebar/Bottombar)
-          window.dispatchEvent(new Event("notifications:update"));
         } else if (data.action === "unrepost") {
           setReposted(false);
-          setCount((c) => Math.max(0, c - 1));
-          toast.info("Repost removido 🗑️");
+          const newCount = Math.max(0, count - 1);
+          setCount(newCount);
+          toast.info("Repost removido 🗑️", {
+            style: {
+              background: "#1e1e2a",
+              color: "#fff",
+              border: "1px solid #877EFF",
+              borderRadius: "10px",
+              padding: "14px 18px",
+              fontSize: "15px",
+              boxShadow: "0 4px 12px rgba(135,126,255,0.3)",
+            },
+          });
 
-          onRepostChange?.(false, count - 1);
-          window.dispatchEvent(new Event("notifications:update"));
+          window.dispatchEvent(new CustomEvent("repost:updated"));
+          window.dispatchEvent(new CustomEvent("thread:refresh"));
+
+          onRepostChange?.(false, newCount);
         }
-
-        // 🔁 Atualiza todos os componentes escutando mudanças de repost
-        window.dispatchEvent(new CustomEvent("repost:updated"));
-        window.dispatchEvent(new CustomEvent("thread:refresh"));
       } catch (err) {
         console.error("Erro ao repostar:", err);
-        toast.error("Falha ao repostar publicação ❌");
+        toast.error("Falha ao repostar publicação ❌", {
+          style: {
+            background: "#1e1e2a",
+            color: "#fff",
+            border: "1px solid #ff5f5f",
+            borderRadius: "10px",
+            padding: "14px 18px",
+            fontSize: "15px",
+            boxShadow: "0 4px 12px rgba(255,95,95,0.3)",
+          },
+        });
       }
     });
   };

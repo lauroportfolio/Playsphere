@@ -83,11 +83,10 @@ const ProfileHeader = async ({
               <Button
                 type="submit"
                 variant={isFollowing ? "secondary" : "default"}
-                className={`cursor-pointer px-4 py-2 rounded-md ${
-                  isFollowing
-                    ? "bg-light-4 text-dark-1 hover:bg-light-3"
-                    : "bg-primary-500 text-white hover:bg-primary-600"
-                }`}
+                className={`cursor-pointer px-4 py-2 rounded-md ${isFollowing
+                  ? "bg-light-4 text-dark-1 hover:bg-light-3"
+                  : "bg-primary-500 text-white hover:bg-primary-600"
+                  }`}
               >
                 {isFollowing ? "Seguindo" : "Seguir"}
               </Button>
@@ -112,7 +111,7 @@ const ProfileHeader = async ({
           <DialogContent className="bg-dark-2 border-none max-w-md max-h-[60vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-light-1 text-lg">
-                Seguidores de {name}
+                Seguidores de <span className="text-primary">{name}</span>
               </DialogTitle>
             </DialogHeader>
 
@@ -126,17 +125,21 @@ const ProfileHeader = async ({
                     href={`/profile/${follower.id}`}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-dark-3 transition"
                   >
-                    <Image
-                      src={follower.image || "/assets/default-profile.png"}
-                      alt={follower.name}
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover"
-                    />
-                    <div>
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden">
+                      <Image
+                        src={follower.image || "/assets/default-profile.png"}
+                        alt={follower.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1">
                       <p className="text-light-1 font-semibold">{follower.name}</p>
                       <p className="text-gray-400 text-sm">@{follower.username}</p>
                     </div>
+                    <button className="cursor-pointer bg-[#877EFF] text-white text-xs px-5 py-2 rounded-md hover:bg-[#6c62d9]">
+                      Ver
+                    </button>
                   </Link>
                 ))}
               </div>
@@ -155,14 +158,12 @@ const ProfileHeader = async ({
           <DialogContent className="bg-dark-2 border-none max-w-md max-h-[60vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-light-1 text-lg">
-                {name} está seguindo
+                <span className="text-primary">{name}</span> está seguindo
               </DialogTitle>
             </DialogHeader>
 
             {followingData.length === 0 ? (
-              <p className="text-light-2 text-sm mt-3">
-                Não segue ninguém ainda.
-              </p>
+              <p className="text-light-2 text-sm mt-3">Não segue ninguém ainda.</p>
             ) : (
               <div className="flex flex-col gap-3 mt-3">
                 {followingData.map((followed: any) => (
@@ -171,17 +172,21 @@ const ProfileHeader = async ({
                     href={`/profile/${followed.id}`}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-dark-3 transition"
                   >
-                    <Image
-                      src={followed.image || "/assets/default-profile.png"}
-                      alt={followed.name}
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover"
-                    />
-                    <div>
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden">
+                      <Image
+                        src={followed.image || "/assets/default-profile.png"}
+                        alt={followed.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1">
                       <p className="text-light-1 font-semibold">{followed.name}</p>
                       <p className="text-gray-400 text-sm">@{followed.username}</p>
                     </div>
+                    <button className="cursor-pointer bg-[#877EFF] text-white text-xs px-5 py-2 rounded-md hover:bg-[#6c62d9]">
+                      Ver
+                    </button>
                   </Link>
                 ))}
               </div>
@@ -205,11 +210,10 @@ const ProfileHeader = async ({
             <Button
               type="submit"
               variant={isFollowing ? "secondary" : "default"}
-              className={`w-full cursor-pointer px-4 py-2 rounded-md ${
-                isFollowing
-                  ? "bg-light-4 text-dark-1 hover:bg-light-3"
-                  : "bg-primary-500 text-white hover:bg-primary-600"
-              }`}
+              className={`w-full cursor-pointer px-4 py-2 rounded-md ${isFollowing
+                ? "bg-light-4 text-dark-1 hover:bg-light-3"
+                : "bg-primary-500 text-white hover:bg-primary-600"
+                }`}
             >
               {isFollowing ? "Seguindo" : "Seguir"}
             </Button>

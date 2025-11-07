@@ -522,3 +522,16 @@ export async function markActivitiesAsRead(userMongoId: string) {
     return false;
   }
 }
+
+export async function fetchCommunities({ limit = 5 }: { limit?: number } = {}) {
+  try {
+    await connectToDB();
+    const communities = await Community.find()
+      .sort({ membersCount: -1 }) // mais populares primeiro
+      .limit(limit);
+    return JSON.parse(JSON.stringify(communities));
+  } catch (err) {
+    console.error("Erro ao buscar comunidades sugeridas:", err);
+    return [];
+  }
+}
