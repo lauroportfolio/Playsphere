@@ -14,7 +14,6 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
 
   const skipAmount = (pageNumber - 1) * pageSize;
 
-  // Busca os posts originais
   const postsQuery = Thread.find({ parentId: { $in: [null, undefined] } })
     .sort({ createdAt: -1 })
     .skip(skipAmount)
@@ -23,6 +22,16 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
       path: "author",
       model: User,
       select: "_id id name username image",
+    })
+    .populate({
+      path: "children",
+      model: Thread,
+      select: "_id author", // 👈 apenas o essencial
+      populate: {
+        path: "author",
+        model: User,
+        select: "_id id name username image", // 👈 mantém padrão com resto
+      },
     })
     .populate({
       path: "community",
@@ -46,7 +55,9 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
         { path: "community", model: Community, select: "_id id name image" },
       ],
     })
-    .select("_id text author community children parentId createdAt likes reposts repostedBy repostOf");
+    .select(
+      "_id text author community children parentId createdAt likes reposts repostedBy repostOf"
+    );
 
   const totalPostsCount = await Thread.countDocuments({
     parentId: { $in: [null, undefined] },
@@ -54,14 +65,10 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
 
   const posts = await postsQuery.exec();
 
-  // 🔁 Converte para objetos simples
   const plainPosts = posts.map((p) => JSON.parse(JSON.stringify(p)));
 
-  // 🔁 Cria "posts virtuais" para cada repost existente
   const virtualReposts = plainPosts.flatMap((post) => {
     if (!post.reposts?.length) return [];
-
-    // Para cada usuário que repostou, gera uma cópia virtual
     return post.reposts.map((user: any) => ({
       ...post,
       _id: `${post._id}-repost-${user.id || user._id}`,
@@ -71,7 +78,6 @@ export async function fetchPosts(pageNumber = 1, pageSize = 20) {
     }));
   });
 
-  // Junta posts originais + reposts visuais
   const allPosts = [...plainPosts, ...virtualReposts].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );

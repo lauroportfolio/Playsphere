@@ -49,7 +49,27 @@ export async function createCommunity(
   }
 }
 
-export async function fetchCommunityDetails(id: string) {
+type MemberPlain = {
+  id?: string;
+  _id?: string;
+  name: string;
+  username: string;
+  image: string;
+};
+
+export type CommunityDetailsPlain = {
+  _id: string;
+  id?: string;
+  name?: string;
+  username?: string;
+  image: string;
+  bio?: string;
+  createdBy?: MemberPlain;
+  members: MemberPlain[];
+  // adicione outros campos que você queira retornar aqui
+} | null;
+
+export async function fetchCommunityDetails(id: string): Promise<CommunityDetailsPlain> {
   try {
     await connectToDB();
 
@@ -57,30 +77,68 @@ export async function fetchCommunityDetails(id: string) {
       ? { $or: [{ id }, { _id: id }] }
       : { id };
 
-    const communityDetails = await Community.findOne(query).populate([
-      {
-        path: "createdBy",
-        model: User,
-        select: "name username image id",
-      },
-      {
-        path: "members",
-        model: User,
-        select: "name username image id",
-      },
-    ]);
+    const communityDoc = await Community.findOne(query)
+      .populate([
+        {
+          path: "createdBy",
+          model: User,
+          select: "name username image id",
+        },
+        {
+          path: "members",
+          model: User,
+          select: "name username image id",
+        },
+      ])
+      .lean<{
+        _id: mongoose.Types.ObjectId;
+        id?: string;
+        name?: string;
+        username?: string;
+        image?: string;
+        bio?: string;
+        createdBy?: any;
+        members?: any[];
+      }>();
 
-    if (!communityDetails) return null;
+    if (!communityDoc) {
+      return null;
+    }
 
-    // 🧩 Normaliza imagem (sem borda branca)
     const normalizedImage =
-      communityDetails.image && communityDetails.image.trim() !== ""
-        ? communityDetails.image
+      communityDoc.image && communityDoc.image.trim() !== ""
+        ? communityDoc.image
         : "/assets/community.svg";
 
+    const membersPlain: MemberPlain[] = Array.isArray(communityDoc.members)
+      ? communityDoc.members.map((m: any) => ({
+          id: m.id,
+          _id: m._id?.toString(),
+          name: m.name || "",
+          username: m.username || "",
+          image: m.image || "",
+        }))
+      : [];
+
+    const createdByPlain: MemberPlain | undefined = communityDoc.createdBy
+      ? {
+          id: communityDoc.createdBy.id,
+          _id: communityDoc.createdBy._id?.toString(),
+          name: communityDoc.createdBy.name || "",
+          username: communityDoc.createdBy.username || "",
+          image: communityDoc.createdBy.image || "",
+        }
+      : undefined;
+
     return {
-      ...communityDetails.toObject(),
+      _id: communityDoc._id.toString(),
+      id: communityDoc.id,
+      name: communityDoc.name,
+      username: communityDoc.username,
       image: normalizedImage,
+      bio: communityDoc.bio,
+      createdBy: createdByPlain,
+      members: membersPlain,
     };
   } catch (error) {
     console.error("Erro ao buscar detalhes da comunidade:", error);
@@ -92,30 +150,55 @@ export async function fetchCommunityPosts(id: string) {
   try {
     connectToDB();
 
-    const communityPosts = await Community.findById(id).populate({
-      path: "threads",
-      model: Thread,
-      populate: [
-        {
-          path: "author",
-          model: User,
-          select: "name image id", // Select the "name" and "_id" fields from the "User" model
-        },
-        {
-          path: "children",
-          model: Thread,
-          populate: {
+    const communityPosts = await Community.findById(id)
+      .populate({
+        path: "threads",
+        model: Thread,
+        populate: [
+          // Autor do post principal
+          {
             path: "author",
             model: User,
-            select: "image _id", // Select the "name" and "_id" fields from the "User" model
+            select: "_id id name username image",
           },
-        },
-      ],
-    });
+          // Comunidade (pra exibir nome/imagem)
+          {
+            path: "community",
+            model: Community,
+            select: "_id id name image",
+          },
+          // Comentários (children)
+          {
+            path: "children",
+            model: Thread,
+            populate: {
+              path: "author",
+              model: User,
+              select: "_id id name username image",
+            },
+          },
+          // Reposts e quem repostou
+          {
+            path: "reposts",
+            model: User,
+            select: "_id id name username image",
+          },
+          {
+            path: "repostedBy",
+            model: User,
+            select: "_id id name username image",
+          },
+        ],
+      })
+      .lean(); // garante objeto simples
 
-    return communityPosts;
+    if (!communityPosts) return null;
+
+    // 🔁 Normaliza todos os _id e campos que podem conter ObjectId
+    const normalized = JSON.parse(JSON.stringify(communityPosts));
+
+    return normalized;
   } catch (error) {
-    // Handle any errors
     console.error("Erro ao buscar posts da comunidade:", error);
     throw error;
   }

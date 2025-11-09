@@ -757,38 +757,22 @@ main {
 
 .rightsidebar {
   position: sticky;
-  /* sticky */
   right: 0;
-  /* right-0 */
   top: 0;
-  /* top-0 */
   z-index: 20;
-  /* z-20 */
   display: flex;
-  /* flex */
   flex-direction: column;
-  /* flex-col */
   justify-content: space-between;
-  gap: 3rem;
-  /* gap-12 (48px) */
+  gap: 2rem;
   height: 100vh;
-  /* h-screen */
   width: fit-content;
-  /* w-fit */
   overflow: auto;
-  /* overflow-auto */
   border-left: 1px solid #1F1F22;
-  /* border-l border-l-dark-4 */
   background-color: #121417;
-  /* bg-dark-2 */
   padding-left: 2rem;
-  /* px-10 (40px) */
   padding-right: 2rem;
-  /* px-10 (40px) */
   padding-bottom: 3rem;
-  /* pb-6 (24px) */
   padding-top: 7rem;
-  /* pt-28 (112px) */
 }
 
 .div-rightsidebar {

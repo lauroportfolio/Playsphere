@@ -14,10 +14,10 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import ShareButton from "../shared/ShareButton";
-import RepostButton from "../shared/RepostButton";
 import DeleteButton from "../shared/DeleteButton";
 import RepostController from "../shared/RepostController";
 import LikeButton from "../shared/LikeButton";
+import CommentsPreview from "../shared/CommentsPreview";
 
 interface UserLite {
   id?: string;
@@ -39,12 +39,13 @@ interface Props {
     image: string;
   } | null;
   createdAt: string;
-  comments: any[];
+  comments: { author?: UserLite }[];  // adaptado para autor dentro de comments
   isComment?: boolean;
   likes?: string[];
   reposts?: any[];
   repostOf?: any | null;
   repostedBy?: UserLite | null;
+  inCommunityPage?: boolean;  // nova prop
 }
 
 const ThreadCard = ({
@@ -61,10 +62,9 @@ const ThreadCard = ({
   reposts = [],
   repostOf = null,
   repostedBy = null,
+  inCommunityPage = false,
 }: Props) => {
   const isRepostThread = Boolean(repostOf);
-
-  // ✅ Se for repost visual, usar reposts do original para refletir contador real
   const effectiveReposts = isRepostThread ? repostOf?.reposts ?? [] : reposts;
   const repostCount = effectiveReposts?.length || 0;
 
@@ -101,6 +101,20 @@ const ThreadCard = ({
 
   const isAuthorOfThisThread = currentUserId === author?.id;
 
+  // ----- NOVO trecho: filtrar comentaristas únicos -----
+  const uniqueAuthors = (comments || [])
+    .map((c: any) => c?.author || {})
+    .filter((a: any, idx: number, arr: any[]) =>
+      a.id !== undefined && arr.findIndex(b => b.id === a.id) === idx
+    );
+  const commentersToShow = uniqueAuthors.slice(0, 2);
+
+  const commentersToShowPlain = commentersToShow.map(c => ({
+    id: String(c.id),
+    image: c.image || "/assets/user.svg",
+    name: c.name || "Usuário"
+  }));
+
   return (
     <article
       className={`flex w-full flex-col rounded-xl ${isComment ? "px-0 xs:px-7" : "bg-dark-2 p-7"
@@ -109,18 +123,20 @@ const ThreadCard = ({
       {/* 🔁 Barra “Repostado por” */}
       {isRepostThread && repostedBy && (
         <div className="mb-3 flex items-center gap-2 text-sm text-gray-400">
-          <Image
-            src={repostedBy.image || "/assets/user.svg"}
-            alt={repostedBy.name || "Reposter"}
-            width={18}
-            height={18}
-            className="rounded-full object-cover"
-          />
+          <div className="w-5 h-5 rounded-full overflow-hidden">
+            <Image
+              src={repostedBy.image || "/assets/user.svg"}
+              alt={repostedBy.name || "Reposter"}
+              width={20}
+              height={20}
+              className="object-cover"
+            />
+          </div>
           <p>
             Repostado por{" "}
             <Link
               href={`/profile/${repostedBy.id}`}
-              className="text-[#877EFF] transition"
+              className="text-[#877EFF] transition hover:underline"
             >
               @{repostedBy.username ?? repostedBy.id}
             </Link>
@@ -159,7 +175,7 @@ const ThreadCard = ({
             {/* 📝 Texto do post */}
             {isRepostThread ? (
               <Link href={`/thread/${repostOf?._id}`}>
-                <p className="mt-2 small-regular text-light-2 hover:underline cursor-pointer">
+                <p className="mt-2 small-regular text-light-2 cursor-pointer">
                   {displayPost.text}
                 </p>
               </Link>
@@ -248,21 +264,22 @@ const ThreadCard = ({
                 )}
               </div>
 
-              {/* 📣 Respostas */}
-              {isComment && comments.length > 0 && (
-                <Link href={`/thread/${targetThreadId}`}>
-                  <p className="mt-1 subtle-medium text-gray-1">
-                    {comments.length} respostas
-                  </p>
-                </Link>
+              {/* Somente exibe a prévia de comentários se não for comentário */}
+              {!isComment && (comments || []).length > 0 && (
+                <CommentsPreview
+                  targetThreadId={targetThreadId}
+                  commenters={commentersToShowPlain}
+                  commentsCount={comments.length}
+                />
               )}
+
             </div>
           </div>
         </div>
       </div>
 
-      {/* 📍 Comunidade */}
-      {!isComment && displayPost?.community && (
+      {/* 📍 Comunidade ou data/hora */}
+      {!inCommunityPage && displayPost.community && (
         <Link
           href={`/communities/${displayPost.community.id}`}
           className="mt-5 flex items-center gap-2"
@@ -271,18 +288,12 @@ const ThreadCard = ({
             {formatDateString(displayPost.createdAt || createdAt)} — Comunidade{" "}
             {displayPost.community.name}
           </p>
-
           <div className="relative ml-1 w-5 h-5 rounded-full overflow-hidden">
             <Image
-              src={
-                displayPost.community.image &&
-                  displayPost.community.image.trim() !== ""
-                  ? displayPost.community.image
-                  : "/assets/community.svg"
-              }
-              alt={displayPost.community.name || "Comunidade"}
+              src={displayPost.community.image || "/assets/community.svg"}
               fill
               className="object-cover"
+              alt={displayPost.community.name}
             />
           </div>
         </Link>

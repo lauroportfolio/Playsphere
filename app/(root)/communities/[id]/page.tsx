@@ -99,21 +99,12 @@ async function Page({ params }: { params: Promise<{ id: string }> }) {
                       key={memberId}
                       className="flex items-center gap-3 bg-dark-3 p-3 rounded-xl"
                     >
-                      <div className="relative w-10 h-10">
-                        <Image
-                          src={member?.image || "/assets/default-profile.png"}
-                          alt={member?.name ?? "Usuário"}
-                          fill
-                          className="object-cover rounded-full border border-dark-4"
-                        />
-                      </div>
-
                       <div className="flex-1">
                         <UserCard
                           id={memberId}
                           name={member?.name ?? "Usuário"}
                           username={member?.username ?? ""}
-                          imgUrl={member?.image || "/assets/user.svg"} // 👈 aqui!
+                          imgUrl={member?.image || "/assets/user.svg"}
                           personType="User"
                         />
                       </div>
@@ -127,11 +118,7 @@ async function Page({ params }: { params: Promise<{ id: string }> }) {
           </TabsContent>
 
           <TabsContent value="requests" className="w-full text-light-1">
-            <ThreadsTab
-              currentUserId={user.id}
-              accountId={communityDetails._id}
-              accountType="Community"
-            />
+            <p className="text-light-3 ml-4 mt-6">Sem solicitações no momento.</p>
           </TabsContent>
         </Tabs>
       </div>
