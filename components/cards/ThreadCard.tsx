@@ -1,4 +1,4 @@
-import { formatDateString } from "@/lib/utils";
+import { formatDateString, formatRelativeOrDate } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -136,7 +136,7 @@ const ThreadCard = ({
             Repostado por{" "}
             <Link
               href={`/profile/${repostedBy.id}`}
-              className="text-[#877EFF] transition hover:underline"
+              className="text-[#877EFF] transition"
             >
               @{repostedBy.username ?? repostedBy.id}
             </Link>
@@ -153,7 +153,7 @@ const ThreadCard = ({
               className="relative h-11 w-11"
             >
               <Image
-                src={displayAuthor.image || "/assets/default-profile.png"}
+                src={displayAuthor.image || "/assets/user.svg"}
                 alt={displayAuthor.name || "Profile Image"}
                 fill
                 className="cursor-pointer rounded-full object-cover"
@@ -163,14 +163,20 @@ const ThreadCard = ({
           </div>
 
           <div className="flex w-full flex-col">
-            <Link
-              href={`/profile/${displayAuthor.id || displayAuthor._id}`}
-              className="w-fit"
-            >
-              <h4 className="cursor-pointer base-semibold text-light-1">
-                {displayAuthor.name}
-              </h4>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/profile/${displayAuthor.id || displayAuthor._id}`}
+                className="w-fit"
+              >
+                <h4 className="cursor-pointer base-semibold text-light-1">
+                  {displayAuthor.name}
+                </h4>
+              </Link>
+
+              <span className="subtle-medium2 text-gray-1">
+                @{displayAuthor.username} • {formatRelativeOrDate(displayPost.createdAt)}
+              </span>
+            </div>
 
             {/* 📝 Texto do post */}
             {isRepostThread ? (

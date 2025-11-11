@@ -86,7 +86,7 @@ export async function fetchUserPosts(userId: string) {
             populate: {
               path: "author",
               model: User,
-              select: "name image id",
+              select: "name username image id"   // adicione username aqui
             },
           },
         ],
@@ -144,7 +144,7 @@ export async function fetchUserPosts(userId: string) {
           populate: {
             path: "author",
             model: User,
-            select: "name image id",
+            select: "name username image id",
           },
         })
         .lean();
@@ -164,9 +164,15 @@ export async function fetchUserPosts(userId: string) {
 
     const uniqueThreads = Array.from(map.values());
 
-    // 4) substituir no objeto user e retornar no mesmo formato que o ThreadsTab espera
-    // (se você precisa do objeto Mongoose com métodos, em vez de plain object, remova o .lean() acima)
-    const userResult = { ...user, threads: uniqueThreads };
+    const sortedThreads = uniqueThreads.sort((a, b) => {
+      // Supondo que a.createdAt e b.createdAt existam como strings ou Date
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA; // decrescente: b primeiro
+    });
+
+    // E então use sortedThreads em vez de uniqueThreads:
+    const userResult = { ...user, threads: sortedThreads };
 
     return userResult;
   } catch (err) {

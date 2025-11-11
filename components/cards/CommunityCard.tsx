@@ -1,3 +1,4 @@
+// CommunityCard.tsx
 import Image from "next/image";
 import Link from "next/link";
 
@@ -8,10 +9,8 @@ interface Props {
   name: string;
   username: string;
   imgUrl: string;
-  bio: string;
-  members: {
-    image: string;
-  }[];
+  bio?: string;                     // agora opcional
+  members?: { image: string }[];   // agora opcional
 }
 
 function CommunityCard({ id, name, username, imgUrl, bio, members }: Props) {
@@ -35,7 +34,9 @@ function CommunityCard({ id, name, username, imgUrl, bio, members }: Props) {
         </div>
       </div>
 
-      <p className='mt-4 subtle-medium text-gray-1'>{bio}</p>
+      {bio && (
+        <p className='mt-4 subtle-medium text-gray-1'>{bio}</p>
+      )}
 
       <div className='mt-5 flex flex-wrap items-center justify-between gap-3'>
         <Link href={`/communities/${id}`}>
@@ -44,13 +45,12 @@ function CommunityCard({ id, name, username, imgUrl, bio, members }: Props) {
           </Button>
         </Link>
 
-        {members.length > 0 && (
+        {members && members.length > 0 && (
           <div className="flex items-center">
             {members.slice(0, 3).map((member, index) => (
               <div
                 key={index}
-                className={`relative h-8 w-8 overflow-hidden rounded-full ${index !== 0 ? "-ml-2" : ""
-                  }`}
+                className={`relative h-8 w-8 overflow-hidden rounded-full ${index !== 0 ? "-ml-2" : ""}`}
               >
                 <Image
                   src={member.image}

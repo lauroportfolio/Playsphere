@@ -19,6 +19,9 @@ import { CommentValidation } from "@/lib/validations/thread";
 import Image from "next/image";
 import { addCommentToThread } from "@/lib/actions/thread.actions";
 
+import { containsBadWords, cleanBadWords } from "@/lib/utils";  // ← import filtro
+import { toast } from "sonner";
+
 interface Props {
   threadId: string;
   currentUserImg: string;
@@ -37,11 +40,27 @@ const Comment = ({ threadId, currentUserImg, currentUserId }: Props) => {
   });
 
   const onSubmit = async (values: z.infer<typeof CommentValidation>) => {
-    console.log("🧩 Comment Debug:", { threadId, currentUserId, pathname });
+    // Verifica filtro de palavras ofensivas
+    if (containsBadWords(values.thread)) {
+      toast.error("Seu comentário contém palavras não permitidas. Por favor revise.", {
+        style: {
+          background: "#1e1e2a",
+          color: "#fff",
+          border: "1px solid #ff5f5f",
+          borderRadius: "10px",
+          padding: "14px 18px",
+          fontSize: "15px",
+          boxShadow: "0 4px 12px rgba(255,95,95,0.3)",
+        },
+      });
+      return;
+    }
+
+    const safeText = cleanBadWords(values.thread);
 
     await addCommentToThread(
       threadId,
-      values.thread,
+      safeText,
       currentUserId,
       pathname
     );

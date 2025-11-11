@@ -86,3 +86,35 @@ export function containsBadWords(text: string): boolean {
 export function cleanBadWords(text: string): string {
   return badWordsFilter.clean(text);
 }
+
+export function formatRelativeOrDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+
+  const oneMin = 1000 * 60;
+  const oneHour = oneMin * 60;
+  const oneDay = oneHour * 24;
+
+  if (diffMs < oneHour) {
+    const minutes = Math.floor(diffMs / oneMin);
+    if (minutes >= 1) return `há ${minutes}m`;
+    const seconds = Math.floor(diffMs / 1000);
+    return `há ${seconds}s`;
+  }
+
+  if (diffMs < oneDay) {
+    const hours = Math.floor(diffMs / oneHour);
+    return `há ${hours}h`;
+  }
+
+  // se for mais de 24h
+  const options: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "short",
+  };
+  if (date.getFullYear() !== now.getFullYear()) {
+    options.year = "numeric";
+  }
+  return date.toLocaleDateString(undefined, options);
+}

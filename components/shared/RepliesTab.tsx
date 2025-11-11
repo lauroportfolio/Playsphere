@@ -44,7 +44,12 @@ const RepliesTab = async ({ userId, currentUserId }: Props) => {
               currentUserId={currentUserId}
               parentId={reply.parentId?._id || null}
               content={reply.text}
-              author={reply.author}
+              author={{
+                id: reply.author.id ?? reply.author._id,
+                name: reply.author.name,
+                username: reply.author.username,   // ← garante username está passado
+                image: reply.author.image,
+              }}
               community={null}
               createdAt={reply.createdAt}
               comments={reply.children || []}

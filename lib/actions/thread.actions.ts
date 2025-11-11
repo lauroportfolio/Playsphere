@@ -212,7 +212,7 @@ export async function fetchThreadById(threadId: string): Promise<any | null> {
         path: "children",
         model: Thread,
         populate: [
-          { path: "author", model: User, select: "_id id name image" },
+          { path: "author", model: User, select: "_id id name username image" },
           { path: "repostedBy", model: User, select: "_id id name username image" },
         ],
       })
@@ -478,37 +478,39 @@ export async function fetchUserReplies(userId: string) {
   try {
     await connectToDB();
 
-    // Busca somente posts que são respostas (têm parentId válido)
     const replies = await Thread.find({
       author: userId,
-      parentId: { $nin: [null, undefined, "null", ""] }, // garante que só respostas reais venham
+      parentId: { $nin: [null, undefined, "null", ""] },
     })
       .populate({
         path: "author",
         model: User,
-        select: "_id id name image",
+        select: "_id id name username image",  // incluí username
       })
       .populate({
         path: "parentId",
         model: Thread,
-        match: { parentId: { $in: [null, undefined, "null", ""] } }, // só parent real (post raiz)
+        match: { parentId: { $in: [null, undefined, "null", ""] } },
         populate: [
           {
             path: "author",
             model: User,
-            select: "_id id name image",
+            select: "_id id name username image",  // incluí username
+          },
+          {
+            path: "children",
+            model: Thread,
+            populate: {
+              path: "author",
+              model: User,
+              select: "_id id name username image",  // incluí username
+            },
           },
           {
             path: "community",
             model: Community,
             select: "_id id name image",
           },
-          {
-            path: "children",
-            model: Thread,
-            select: "_id",
-          },
-          // populate reposts and repostOf on parent
           {
             path: "reposts",
             model: User,
@@ -518,8 +520,16 @@ export async function fetchUserReplies(userId: string) {
             path: "repostOf",
             model: Thread,
             populate: [
-              { path: "author", model: User, select: "_id id name username image" },
-              { path: "community", model: Community, select: "_id id name image" },
+              {
+                path: "author",
+                model: User,
+                select: "_id id name username image",
+              },
+              {
+                path: "community",
+                model: Community,
+                select: "_id id name image",
+              },
             ],
           },
           {
@@ -529,10 +539,9 @@ export async function fetchUserReplies(userId: string) {
           },
         ],
       })
-      .sort({ createdAt: -1 }) // mais recente primeiro
+      .sort({ createdAt: -1 })
       .lean();
 
-    // Filtra apenas as respostas que têm um post pai válido (evita posts próprios)
     const filteredReplies = replies.filter((reply: any) => {
       const parent: any = reply.parentId;
       return (
@@ -543,27 +552,37 @@ export async function fetchUserReplies(userId: string) {
       );
     });
 
-    // Normaliza reposts (tanto do reply quanto do parent) antes de retornar
     const normalized = filteredReplies.map((reply: any) => {
-      const normReplyReposts = (reply.reposts || []).map((r: any) =>
-        typeof r === "string" ? r : r?.id || r?._id?.toString?.() || ""
-      );
-
-      const normParent = reply.parentId
-        ? {
-          ...reply.parentId,
-          reposts: (reply.parentId.reposts || []).map((r: any) =>
-            typeof r === "string" ? r : r?.id || r?._id?.toString?.() || ""
-          ),
-          repostOf: reply.parentId.repostOf || null,
-          repostedBy: reply.parentId.repostedBy || null,
-        }
-        : null;
-
       return {
         ...reply,
-        reposts: normReplyReposts,
-        parentId: normParent,
+        author: {
+          id: reply.author?.id,
+          name: reply.author?.name || "",
+          username: reply.author?.username || "",  // ← garante username
+          image: reply.author?.image || "",
+        },
+        parentId: {
+          ...reply.parentId,
+          author: {
+            id: reply.parentId.author?.id,
+            name: reply.parentId.author?.name || "",
+            username: reply.parentId.author?.username || "",  // se quiser exibir no pai
+            image: reply.parentId.author?.image || "",
+          },
+          children: Array.isArray(reply.parentId.children)
+            ? reply.parentId.children.map((c: any) => ({
+              id: c._id?.toString(),
+              author: {
+                id: c.author?.id,
+                name: c.author?.name || "",
+                username: c.author?.username || "",  // garante
+                image: c.author?.image || "",
+              },
+              text: c.text,
+              createdAt: c.createdAt,
+            }))
+            : [],
+        },
       };
     });
 

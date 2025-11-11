@@ -143,6 +143,12 @@ main {
   font-weight: 500;
 }
 
+.subtle-medium2 {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
 .subtle-semibold {
   font-size: 12px;
   line-height: 16px;
@@ -345,6 +351,10 @@ main {
   font-size: 0.875rem;
   font-weight: 400;
   color: #FFFFFF;
+}
+
+.comment-form_btn:hover {
+  background-color: #6c62d9;
 }
 
 .user-card {
