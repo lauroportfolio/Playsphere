@@ -118,3 +118,161 @@ export function formatRelativeOrDate(dateString: string): string {
   }
   return date.toLocaleDateString(undefined, options);
 }
+
+// 🔤 Normaliza texto removendo acentos e colocando em minúsculas
+function normalize(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+// 🔎 Verifica se alguma frase da lista aparece no texto
+function anyMatch(text: string, list: string[]) {
+  for (const phrase of list) {
+    const p = phrase.toLowerCase();
+    if (text.includes(p)) return true;
+  }
+  return false;
+}
+
+export function detectSelfHarmRisk(input: string): boolean {
+  if (!input) return false;
+
+  const text = normalize(input);
+
+  // -------------------------------------
+  // PT/BR – risco alto (mais direto)
+  // -------------------------------------
+  const PT_HIGH = [
+    "quero me matar",
+    "vou me matar",
+    "vou me suicidar",
+    "quero me suicidar",
+    "vou morrer",
+    "quero morrer",
+    "nao quero mais viver",
+    "nao aguento mais viver",
+    "acabar com minha vida",
+    "tirar minha vida",
+    "tirar a minha vida",
+    "morrer agora",
+    "acabar com tudo",
+    "acabar com a minha vida",
+  ];
+
+  // -------------------------------------
+  // PT/BR – risco médio
+  // -------------------------------------
+  const PT_MEDIUM = [
+    "nao aguento mais",
+    "nao vejo saida",
+    "quero sumir",
+    "quero desaparecer",
+    "desisti da vida",
+    "estou pensando em morrer",
+    "estou com depressao",
+    "depressao pesada",
+  ];
+
+  // -------------------------------------
+  // PT/BR – risco leve
+  // -------------------------------------
+  const PT_LOW = [
+    "depressao",
+    "deprimido",
+    "deprimida",
+    "me sinto vazio",
+    "me sinto sem esperanca",
+    "me sinto sozinho",
+    "triste demais",
+    "muito triste",
+    "to mal",
+    "estou mal",
+    "dor emocional",
+    "nao presto",
+    "odio de mim mesmo",
+    "ninguem se importa",
+    "quero desistir",
+    "nao quero viver",
+    "nao tenho motivos",
+    "sofrimento",
+  ];
+
+  // -------------------------------------
+  // INGLÊS – risco alto
+  // -------------------------------------
+  const EN_HIGH = [
+    "i want to die",
+    "i want to kill myself",
+    "im going to kill myself",
+    "i will kill myself",
+    "im going to die",
+    "i want to end my life",
+    "end my life",
+  ];
+
+  // -------------------------------------
+  // INGLÊS – risco médio
+  // -------------------------------------
+  const EN_MEDIUM = [
+    "i cant go on",
+    "i cant live like this",
+    "i want to disappear",
+    "i want to be gone",
+    "i want to end it all",
+  ];
+
+  // -------------------------------------
+  // INGLÊS – risco leve
+  // -------------------------------------
+  const EN_LOW = [
+    "depressed",
+    "depression",
+    "feeling hopeless",
+    "feeling empty",
+    "feeling alone",
+    "very sad",
+  ];
+
+  // -------------------------------------
+  // SEU detector original preservado
+  // -------------------------------------
+  const ORIGINAL = [
+    "morrer",
+    "morrer agora",
+    "quero morrer",
+    "acabar com tudo",
+    "não aguento mais",
+    "me matar",
+    "tirar minha vida",
+    "quero sumir",
+    "depressão",
+    "estou com depressão",
+    "me sinto sozinho",
+    "não vejo saída",
+    "não quero viver",
+    "não tenho motivos",
+    "sofrimento",
+    "dor emocional",
+    "não presto",
+    "ódio de mim mesmo",
+    "ninguém se importa",
+    "tô mal",
+    "estou mal",
+    "quero desistir",
+    "acabar com a minha vida",
+  ].map(normalize);
+
+  // -------------------------------------
+  // VERIFICAÇÃO EM NÍVEIS
+  // (basta dar match em qualquer nível)
+  // -------------------------------------
+
+  if (anyMatch(text, PT_HIGH) || anyMatch(text, EN_HIGH)) return true;
+  if (anyMatch(text, PT_MEDIUM) || anyMatch(text, EN_MEDIUM)) return true;
+  if (anyMatch(text, PT_LOW) || anyMatch(text, EN_LOW)) return true;
+  if (anyMatch(text, ORIGINAL)) return true;
+
+  return false;
+}

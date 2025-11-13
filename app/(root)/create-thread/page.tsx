@@ -16,7 +16,12 @@ async function Page() {
         <>
             <h1 className="head-text">Criar Postagem</h1>
 
-            <PostThread userId={userInfo._id.toString()} />
+            <PostThread
+                userId={userInfo._id.toString()}
+                userName={userInfo.name}
+                userImage={userInfo.image}
+                userUsername={userInfo.username}
+            />
         </>
     )
 }

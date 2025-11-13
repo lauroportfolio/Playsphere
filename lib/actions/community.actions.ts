@@ -112,22 +112,22 @@ export async function fetchCommunityDetails(id: string): Promise<CommunityDetail
 
     const membersPlain: MemberPlain[] = Array.isArray(communityDoc.members)
       ? communityDoc.members.map((m: any) => ({
-          id: m.id,
-          _id: m._id?.toString(),
-          name: m.name || "",
-          username: m.username || "",
-          image: m.image || "",
-        }))
+        id: m.id,
+        _id: m._id?.toString(),
+        name: m.name || "",
+        username: m.username || "",
+        image: m.image || "",
+      }))
       : [];
 
     const createdByPlain: MemberPlain | undefined = communityDoc.createdBy
       ? {
-          id: communityDoc.createdBy.id,
-          _id: communityDoc.createdBy._id?.toString(),
-          name: communityDoc.createdBy.name || "",
-          username: communityDoc.createdBy.username || "",
-          image: communityDoc.createdBy.image || "",
-        }
+        id: communityDoc.createdBy.id,
+        _id: communityDoc.createdBy._id?.toString(),
+        name: communityDoc.createdBy.name || "",
+        username: communityDoc.createdBy.username || "",
+        image: communityDoc.createdBy.image || "",
+      }
       : undefined;
 
     return {
@@ -218,16 +218,11 @@ export async function fetchCommunities({
   try {
     connectToDB();
 
-    // Calculate the number of communities to skip based on the page number and page size.
     const skipAmount = (pageNumber - 1) * pageSize;
-
-    // Create a case-insensitive regular expression for the provided search string.
     const regex = new RegExp(searchString, "i");
 
-    // Create an initial query object to filter communities.
     const query: FilterQuery<typeof Community> = {};
 
-    // If the search string is not empty, add the $or operator to match either username or name fields.
     if (searchString.trim() !== "") {
       query.$or = [
         { username: { $regex: regex } },
@@ -235,31 +230,33 @@ export async function fetchCommunities({
       ];
     }
 
-    // Define the sort options for the fetched communities based on createdAt field and provided sort order.
     const sortOptions = { createdAt: sortBy };
 
-    // Create a query to fetch the communities based on the search and sort criteria.
     const communitiesQuery = Community.find(query)
-      .sort(sortOptions)
+      .sort({ createdAt: -1, _id: -1 }) // 👈 ORDEM GARANTIDA
       .skip(skipAmount)
       .limit(pageSize)
       .populate("members");
 
-    // Count the total number of communities that match the search criteria (without pagination).
     const totalCommunitiesCount = await Community.countDocuments(query);
 
     const communities = await communitiesQuery.exec();
 
-    // Check if there are more communities beyond the current page.
-    const isNext = totalCommunitiesCount > skipAmount + communities.length;
+    // 🟢 NORMALIZAÇÃO — garante que todos os campos existam
+    const normalized = communities.map((c) => {
+      const obj = c.toObject();
 
-    const normalized = communities.map((c) => ({
-      ...c.toObject(),
-      image:
-        c.image && c.image.trim() !== ""
-          ? c.image
-          : "/assets/community.svg",
-    }));
+      return {
+        id: obj.id ?? obj._id.toString(),        // fallback seguro
+        name: obj.name ?? "Comunidade sem nome", // evita crash no card
+        username: obj.username ?? "unknown",
+        image: obj.image?.trim() || "/assets/community.svg",
+        bio: obj.bio ?? "",
+        members: Array.isArray(obj.members) ? obj.members : [],
+      };
+    });
+
+    const isNext = totalCommunitiesCount > skipAmount + communities.length;
 
     return { communities: normalized, isNext };
   } catch (error) {

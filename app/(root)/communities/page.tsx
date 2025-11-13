@@ -11,6 +11,7 @@ async function Page({
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
+  // ✔ Agora estamos seguindo exatamente o que o Next exige
   const params = await searchParams;
 
   const user = await currentUser();
@@ -19,24 +20,25 @@ async function Page({
   const userInfo = await fetchUser(user.id);
   if (!userInfo?.onboarded) redirect("/onboarding");
 
+  const page = params.page ? Number(params.page) : 1;
+
   const result = await fetchCommunities({
     searchString: params.q ?? "",
-    pageNumber: params.page ? +params.page : 1,
-    pageSize: 8,
+    pageNumber: page,
+    pageSize: 4,
   });
 
   return (
     <section>
       <h1 className="head-text mb-10">Buscar Comunidades</h1>
 
-      {/* 🔍 Barra de busca */}
       <Searchbar routeType="communities" />
 
-      <div className="mt-9 flex flex-wrap gap-4">
+      <div className="communities-container mt-9">
         {result.communities.length === 0 ? (
           <p className="no-result">Nenhuma comunidade encontrada</p>
         ) : (
-          result.communities.map((community: any) => (
+          result.communities.map((community) => (
             <CommunityCard
               key={community.id}
               id={community.id}
@@ -50,10 +52,9 @@ async function Page({
         )}
       </div>
 
-      {/* 🔄 Paginação */}
       <Pagination
         path="communities"
-        pageNumber={params.page ? +params.page : 1}
+        pageNumber={page}
         isNext={result.isNext}
       />
     </section>
